@@ -324,7 +324,8 @@ class SearchWorkflow:
                 print(f"   📊 누적 오프셋 업데이트: {cumulative_rank_offset} (현재 페이지 +{len(all_products_params)})")
 
                 # Edit 모드에서 1~2페이지 탐색 후 상품을 찾지 못한 경우
-                if self.enable_rank_manipulation and current_page == 2 and min_rank:
+                # (edit2는 제외 - 순차 탐색 유지)
+                if self.enable_rank_manipulation and self.edit_mode != "edit2" and current_page == 2 and min_rank:
                     print(f"\n{'=' * 60}")
                     print(f"⚡ Edit 모드: 1~2페이지에서 상품 미발견")
                     print(f"{'=' * 60}\n")

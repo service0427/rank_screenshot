@@ -1,0 +1,101 @@
+[
+  {
+    "id": 1,
+    "priority": 1,
+    "action": {"type": "block"},
+    "condition": {
+      "requestDomains": ["criteo.com", "*.criteo.com"],
+      "resourceTypes": ["script", "image", "xmlhttprequest", "sub_frame", "other", "stylesheet", "font", "media"]
+    }
+  },
+  {
+    "id": 2,
+    "priority": 1,
+    "action": {"type": "block"},
+    "condition": {
+      "requestDomains": ["criteo.net", "*.criteo.net"],
+      "resourceTypes": ["script", "image", "xmlhttprequest", "sub_frame", "other", "stylesheet", "font", "media"]
+    }
+  },
+  {
+    "id": 3,
+    "priority": 1,
+    "action": {"type": "block"},
+    "condition": {
+      "requestDomains": ["google-analytics.com", "*.google-analytics.com"],
+      "resourceTypes": ["script", "image", "xmlhttprequest", "sub_frame", "other", "stylesheet", "font", "media"]
+    }
+  },
+  {
+    "id": 4,
+    "priority": 1,
+    "action": {"type": "block"},
+    "condition": {
+      "requestDomains": ["googletagmanager.com", "*.googletagmanager.com"],
+      "resourceTypes": ["script", "image", "xmlhttprequest", "sub_frame", "other", "stylesheet", "font", "media"]
+    }
+  },
+  {
+    "id": 5,
+    "priority": 1,
+    "action": {"type": "block"},
+    "condition": {
+      "requestDomains": ["doubleclick.net", "*.doubleclick.net"],
+      "resourceTypes": ["script", "image", "xmlhttprequest", "sub_frame", "other", "stylesheet", "font", "media"]
+    }
+  },
+  {
+    "id": 6,
+    "priority": 1,
+    "action": {"type": "block"},
+    "condition": {
+      "requestDomains": ["googlesyndication.com", "*.googlesyndication.com"],
+      "resourceTypes": ["script", "image", "xmlhttprequest", "sub_frame", "other", "stylesheet", "font", "media"]
+    }
+  },
+  {
+    "id": 7,
+    "priority": 1,
+    "action": {"type": "block"},
+    "condition": {
+      "requestDomains": ["facebook.com", "*.facebook.com"],
+      "resourceTypes": ["script", "image", "xmlhttprequest", "sub_frame", "other", "stylesheet", "font", "media"]
+    }
+  },
+  {
+    "id": 8,
+    "priority": 1,
+    "action": {"type": "block"},
+    "condition": {
+      "requestDomains": ["facebook.net", "*.facebook.net"],
+      "resourceTypes": ["script", "image", "xmlhttprequest", "sub_frame", "other", "stylesheet", "font", "media"]
+    }
+  },
+  {
+    "id": 9,
+    "priority": 1,
+    "action": {"type": "block"},
+    "condition": {
+      "requestDomains": ["mercury.coupang.com"],
+      "resourceTypes": ["script", "image", "xmlhttprequest", "sub_frame", "other", "stylesheet", "font", "media"]
+    }
+  },
+  {
+    "id": 10,
+    "priority": 1,
+    "action": {"type": "block"},
+    "condition": {
+      "requestDomains": ["ads.coupang.com"],
+      "resourceTypes": ["script", "image", "xmlhttprequest", "sub_frame", "other", "stylesheet", "font", "media"]
+    }
+  },
+  {
+    "id": 11,
+    "priority": 1,
+    "action": {"type": "block"},
+    "condition": {
+      "requestDomains": ["rocketyourcard.coupang.com"],
+      "resourceTypes": ["script", "image", "xmlhttprequest", "sub_frame", "other", "stylesheet", "font", "media"]
+    }
+  }
+]

@@ -1,0 +1,46 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Virtual Environment
+venv/
+env/
+ENV/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Agent specific
+browser-profiles/
+chrome-version/
+firefox-version/
+.last_version
+
+# Logs and outputs
+*.log
+/tmp/
+debug_logs/
+screenshots/
+rank_states/
+videos/
+
+# Backup files
+*.backup
+*.bak
+
+# curl-cffi test outputs
+output/

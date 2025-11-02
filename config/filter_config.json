@@ -1,0 +1,70 @@
+{
+  "console_only_filters": {
+    "description": "콘솔에서만 필터 (로그 파일에는 기록됨) - 불필요한 리소스",
+    "patterns": [
+      "\\.jpg",
+      "\\.jpeg",
+      "\\.png",
+      "\\.gif",
+      "\\.webp",
+      "\\.svg",
+      "\\.ico",
+      "\\.css",
+      "\\.woff",
+      "\\.woff2",
+      "\\.ttf",
+      "\\.mp4",
+      "\\.webm",
+      "ljc\\.coupang\\.com/api/v2/submit",
+      "mercury\\.coupang\\.com/e\\.gif",
+      "sslwidget\\.criteo\\.com",
+      "www\\.coupang\\.com/akam/13/pixel"
+    ]
+  },
+  "full_filters": {
+    "description": "완전 차단 (네트워크 요청 자체를 차단) - 광고/트래킹",
+    "domains": [
+      "google-analytics.com",
+      "googletagmanager.com",
+      "doubleclick.net",
+      "googlesyndication.com",
+      "adservice.google.com",
+      "facebook.com",
+      "facebook.net",
+      "youtube.com",
+      "instagram.com",
+      "twitter.com",
+      "criteo.com",
+      "criteo.net",
+      "mercury.coupang.com",
+      "rocketyourcard.coupang.com",
+      "ads.coupang.com"
+    ],
+    "patterns": [
+      "/banner/",
+      "/ad/",
+      "/ads/",
+      "/tracking/",
+      "/analytics/",
+      "/gtm\\.js",
+      "/ga\\.js",
+      "/pixel",
+      "/beacon"
+    ]
+  },
+  "domain_whitelist": {
+    "description": "허용 도메인 - 검색 기능 유지를 위해 필수",
+    "domains": [
+      "www.coupang.com",
+      "image[0-9]*\\.coupangcdn\\.com",
+      "static\\.coupangcdn\\.com"
+    ]
+  },
+  "coupang_specific": {
+    "description": "쿠팡 메인 페이지 최적화 - 검색창만 유지",
+    "block_main_banners": true,
+    "block_recommendation": true,
+    "block_product_thumbnails": false,
+    "notes": "검색 기능 유지를 위해 search API, autocomplete는 허용"
+  }
+}

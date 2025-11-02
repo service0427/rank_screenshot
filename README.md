@@ -1,0 +1,339 @@
+# Coupang Agent V2
+
+Selenium + undetected-chromedriver를 사용한 쿠팡 자동화 탐지 테스트 도구
+
+## 🎯 주요 기능
+
+- ✅ **Chrome 127~144 버전 지원** (18개 Stable 버전)
+- ✅ **Chrome Beta/Dev/Canary 채널 지원** (3개 채널)
+- ✅ **undetected-chromedriver** - 자동화 탐지 우회
+- ✅ **TLS 핑거프린팅 우회** - 버전별 다양성 (총 21개 버전)
+- ✅ **빌드 번호 다양성** - Stable vs 채널 빌드 번호 차이
+- ✅ **VPN 통합** - IP 우회 (다중 VPN 서버 지원)
+- ✅ **버전별 프로필 분리** - 쿠키/세션/로컬스토리지
+- ✅ **공유 캐시 시스템** - 디스크 공간 70% 절약
+- ✅ **72시간 미사용 캐시 자동 정리**
+- ✅ **한국어 브라우저 설정**
+- ✅ **1920x1080 고정 viewport**
+- ✅ **http2_protocol_error 탐지**
+
+## 📦 설치
+
+### 1. Chrome 버전 설치
+
+#### Stable 버전 (127~144)
+```bash
+# 모든 Stable 버전 설치
+./install-chrome-versions.sh all
+
+# 특정 버전만 설치
+./install-chrome-versions.sh 134
+```
+
+#### Chrome 채널 (Beta/Dev/Canary)
+```bash
+# 모든 채널 설치 (Beta, Dev, Canary)
+./install-chrome-versions.sh channels
+
+# 개별 채널 설치
+./install-chrome-versions.sh beta
+./install-chrome-versions.sh dev
+./install-chrome-versions.sh canary
+
+# Stable + 채널 모두 설치
+./install-chrome-versions.sh complete
+```
+
+**채널 특징**:
+- **Beta**: 안정성 높음, 4주마다 새 메이저 버전
+- **Dev**: 최신 기능, 매주 업데이트
+- **Canary**: 최첨단 빌드, 매일 업데이트
+- **빌드 번호 다양성**: Stable 143과 Beta 143은 빌드 번호가 다름 (143.0.6948.x vs 143.0.7499.x)
+
+### 2. Python 패키지 설치
+
+```bash
+pip install undetected-chromedriver selenium
+```
+
+### 3. 권한 설정 (VPN 사용 시 필수)
+
+VPN과 함께 사용하는 경우 권한 설정이 필요합니다:
+
+```bash
+# 권한 설정 스크립트 실행
+./setup-permissions.sh
+```
+
+이 스크립트는 다음을 설정합니다:
+- Agent 디렉토리 읽기 권한
+- Browser profiles 쓰기 권한
+- ChromeDriver 캐시 쓰기 권한
+- Python 패키지 읽기 권한
+
+**배포 시 주의사항:**
+- 서버 환경마다 경로가 다를 수 있음
+- VPN 클라이언트 설치 후 실행 권장
+- 권한 오류 발생 시 재실행
+
+## 🚀 사용법
+
+### 간편 실행 (권장)
+
+**`--version` 없이 실행하면 자동으로 버전 선택 프롬프트 표시**:
+
+```bash
+# 가장 많이 사용하는 패턴
+python3 agent.py --close                    # 버전 선택 → 자동 종료
+python3 agent.py --vpn 0 --close            # VPN wg0 + 버전 선택 → 자동 종료
+python3 agent.py --keyword "게임"           # 버전 선택 → 게임 검색
+
+# --version이 없으면 자동으로 버전 리스트 표시
+============================================================
+🔍 Chrome 버전 선택
+============================================================
+➤ 19. Chrome beta    ← 마지막 사용 버전
+  20. Chrome dev
+  21. Chrome canary
+
+선택 (1-21, Enter=마지막 사용: beta): [Enter]
+✓ 마지막 사용 버전 선택: Chrome beta
+============================================================
+```
+
+**특징**:
+- ✅ **21개 Chrome 버전** 중 선택 (Stable 18 + 채널 3)
+- ✅ **마지막 사용 버전 기억** - Enter만 누르면 이전 버전 재사용
+- ✅ **➤ 표시**로 마지막 사용 버전 강조
+- ✅ **다른 옵션 유지** - `--vpn`, `--close`, `--keyword` 등은 그대로 적용
+
+**사용 예시**:
+```
+============================================================
+🤖 Selenium + undetected-chromedriver Interactive Mode
+============================================================
+
+사용 가능한 Chrome 버전:
+   1. Chrome 127
+   2. Chrome 128
+   ...
+  18. Chrome 144
+➤ 19. Chrome beta    ← 마지막 사용 버전
+  20. Chrome dev
+  21. Chrome canary
+
+선택 (1-21, Enter=마지막 사용: beta): [Enter 입력]
+✓ 마지막 사용 버전 선택: Chrome beta
+
+검색 키워드 (기본: 노트북): 게임
+탐지 테스트를 실행하시겠습니까? (y/N): n
+```
+
+### 명령행 옵션 (자동화용)
+
+```bash
+# 특정 버전 지정
+python3 agent.py --version 134
+python3 agent.py --version beta
+
+# 키워드 지정
+python3 agent.py --version 134 --keyword "게임"
+
+# 자동 종료 (3초 후)
+python3 agent.py --version 134 --close
+
+# 탐지 테스트 실행
+python3 agent.py --version 134 --test-detection
+
+# VPN 사용
+python3 agent.py --vpn 0 --version 127
+python3 agent.py --vpn 1 --version beta
+```
+
+### VPN 사용법
+
+VPN을 사용하면 IP 우회를 통해 차단된 Chrome 버전(127-130)을 사용할 수 있습니다:
+
+```bash
+# VPN 없이 실행 (로컬 IP)
+python3 agent.py --version 134
+
+# VPN 서버로 실행 (IP 우회)
+python3 agent.py --vpn 0 --version 127  # wg0/vpn0 사용
+python3 agent.py --vpn 1 --version 127  # wg1/vpn1 사용
+python3 agent.py --vpn 2 --version 128  # wg2/vpn2 사용
+python3 agent.py --vpn 3 --version beta # wg3/vpn3 사용
+```
+
+**VPN 옵션**:
+- `--vpn` 옵션 없음: 로컬 IP / VPN 사용 안 함 (기본값)
+- `--vpn 0`: wg0/vpn0 사용 (첫 번째 VPN 서버)
+- `--vpn 1`: wg1/vpn1 사용 (두 번째 VPN 서버)
+- `--vpn N`: wgN/vpnN 사용 (N+1번째 VPN 서버)
+
+**VPN 설치**:
+VPN 클라이언트가 필요합니다: https://github.com/service0427/vpn
+
+### 종료 방법
+
+브라우저 실행 중 다음 방법으로 종료할 수 있습니다:
+- **Enter 키**: 터미널에서 Enter만 누르면 종료
+- **Ctrl+C**: 키보드 인터럽트로 종료
+- **창 닫기**: 브라우저 창을 직접 닫기
+
+## 📁 프로젝트 구조
+
+```
+agent/
+├── agent.py                      # 메인 실행 파일
+├── multi_browser_manager.py      # 브라우저 버전 관리 라이브러리
+├── install-chrome-versions.sh    # Chrome 설치 스크립트 (Stable + 채널 통합)
+├── lib/
+│   ├── core/
+│   │   └── browser_core_uc.py    # undetected-chromedriver 코어
+│   ├── modules/
+│   │   └── coupang_handler_selenium.py  # 쿠팡 핸들러
+│   ├── utils/
+│   │   └── human_behavior_selenium.py   # 사람 행동 시뮬레이션
+│   └── constants.py              # 상수 정의
+├── chrome-version/               # Chrome 바이너리 (127~144)
+└── browser-profiles/             # 브라우저 프로필
+    ├── chrome-127/               # 버전별 프로필
+    ├── chrome-134/
+    └── shared-cache/             # 공유 캐시 (500MB 제한)
+```
+
+## 🔧 multi_browser_manager.py 역할
+
+`multi_browser_manager.py`는 **브라우저 버전 관리 라이브러리**입니다:
+
+**주요 기능**:
+- ✅ **자동 버전 스캔**: `chrome-version/` 디렉토리에서 설치된 Chrome 버전 자동 감지
+- ✅ **랜덤 버전 선택**: 21개 버전(Stable 18 + 채널 3) 중 랜덤 선택
+- ✅ **그룹별 선택**: old(127-130), new(131-141), latest(142-144), channels(beta/dev/canary)
+- ✅ **다양한 브라우저 지원**: nodriver, Selenium, Playwright 예제 코드 포함
+
+**사용 예시**:
+```python
+from multi_browser_manager import BrowserVersionManager
+
+# 버전 관리자 생성
+manager = BrowserVersionManager()
+
+# 랜덤 Chrome 선택 (Stable + 채널 포함)
+version, chrome_path = manager.get_random_chrome()
+
+# 그룹별 선택
+version, path = manager.get_chrome_group("old")      # 127-130 중 랜덤
+version, path = manager.get_chrome_group("channels")  # Beta/Dev/Canary 중 랜덤
+
+# 특정 버전 가져오기
+chrome_path = manager.get_chrome("134")
+chrome_path = manager.get_chrome("beta")
+```
+
+## 💡 주요 기능 설명
+
+### 1. 버전별 프로필 분리
+
+각 Chrome 버전마다 독립적인 프로필을 사용합니다:
+- **쿠키**: 버전별 독립
+- **세션 스토리지**: 버전별 독립
+- **로컬 스토리지**: 버전별 독립
+- **캐시**: 모든 버전이 공유 (트래픽 절약)
+
+### 2. 공유 캐시 시스템
+
+```
+browser-profiles/
+├── chrome-127/     (3.6MB - 프로필만)
+├── chrome-134/     (3.7MB - 프로필만)
+└── shared-cache/   (15MB - 공유 캐시)
+```
+
+**절약 효과**:
+- 비공유: ~216MB (18 × 12MB)
+- 공유: ~78MB (15MB + 18 × 3.5MB)
+- **약 70% 절약**
+
+### 3. 자동 캐시 정리
+
+72시간 이상 사용되지 않은 캐시 파일을 자동으로 삭제하여 디스크 공간을 관리합니다.
+
+### 4. 한국어 환경 설정
+
+- `navigator.language`: ko-KR
+- Accept-Language 헤더: ko-KR,ko;q=0.9
+- 번역 제안 비활성화
+
+### 5. Viewport 고정
+
+내부 콘텐츠 영역을 1920x1080으로 고정하여 일관된 렌더링을 제공합니다.
+
+## 🔧 기술 스택
+
+- **Python 3.12+**
+- **Selenium 4.x**
+- **undetected-chromedriver 3.x**
+- **Chrome for Testing 127~144**
+
+## 📊 실행 예시
+
+```bash
+$ python3 agent.py --version 134 --keyword "노트북" --close
+
+============================================================
+🤖 Coupang Agent V2 - Selenium + undetected-chromedriver
+============================================================
+Instance ID: 1
+Keyword: 노트북
+Chrome Version: 134
+Detection Test: False
+============================================================
+
+🧹 Cleaning cache older than 72 hours...
+   ✓ No old cache to clean
+🚀 Launching Chrome 134 with undetected-chromedriver...
+   Path: /home/tech/agent/chrome-version/134/chrome-linux64/chrome
+   Profile: /home/tech/agent/browser-profiles/chrome-134
+   ✓ Chrome launched (undetected-chromedriver)
+   ✓ Anti-detection: ENABLED by default
+
+============================================================
+🔍 Browser Version Information
+============================================================
+   Chrome Version: 134.0.6998.165
+   └─ Major: 134 | Minor: 0 | Build: 6998 | Patch: 165
+   User Agent: Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36
+   Language: ko-KR
+   Languages: ['ko-KR']
+   Viewport: 1920x1080
+============================================================
+
+============================================================
+🌐 Checking IP Address
+============================================================
+   Public IP: 112.161.221.193
+============================================================
+
+🧹 Clearing cookies, session & local storage (cache preserved)...
+   ✓ All storage cleared (cache preserved)
+🏠 Navigating to Coupang home...
+   ✓ Home page loaded
+🔍 Searching for: 노트북
+   ✓ Search script executed for: 노트북
+   ✓ Search completed
+
+🔍 Checking for errors...
+
+============================================================
+✅ SUCCESS: No errors detected!
+============================================================
+Current URL: https://www.coupang.com/np/search?component=&q=노트북&traceId=...
+Status: {'execution_status': 'RESULTS_LOADED', 'action_status': 'SUCCESS', ...}
+============================================================
+```
+
+## 📝 라이센스
+
+MIT License

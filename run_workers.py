@@ -61,6 +61,7 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats):
                     "python3", "agent.py",
                     "--work-api",
                     "--version", "random",
+                    "--edit2",  # Simple Swap 모드 (같은 페이지 내 순위 조작)
                     "--close",
                     "--instance", str(worker_id)  # 워커 ID를 instance_id로 사용
                 ],

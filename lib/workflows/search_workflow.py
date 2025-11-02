@@ -765,10 +765,13 @@ class SearchWorkflow:
                         print(f"📸 순위 변경 후 스크린샷 캡처 (새 위치: {min_rank}등)")
                     print(f"{'=' * 60}\n")
 
-                    # 새 위치에 하이라이트 재적용
+                    # 새 위치에 하이라이트 재적용 (전역 순위 사용)
+                    updated_product_with_global_rank = updated_product.copy()
+                    updated_product_with_global_rank['rank'] = min_rank  # 전역 순위로 덮어쓰기
+
                     self._highlight_product(
                         element=updated_product['element'],
-                        product_data=updated_product,
+                        product_data=updated_product_with_global_rank,
                         match_condition=match_condition
                     )
 
@@ -805,10 +808,13 @@ class SearchWorkflow:
                     print(f"📸 현재 위치 스크린샷 캡처 (순위 이동 없음)")
                     print(f"{'=' * 60}\n")
 
-                    # 하이라이트 적용
+                    # 하이라이트 적용 (전역 순위 사용)
+                    found_product_with_global_rank = found_product.copy()
+                    found_product_with_global_rank['rank'] = min_rank  # 전역 순위로 덮어쓰기
+
                     self._highlight_product(
                         element=product_info['element'],
-                        product_data=found_product,
+                        product_data=found_product_with_global_rank,
                         match_condition=match_condition
                     )
 
@@ -831,10 +837,13 @@ class SearchWorkflow:
                 print(f"📸 스크린샷 캡처 (순위 변조 비활성화)")
                 print(f"{'=' * 60}\n")
 
-                # 하이라이트 적용
+                # 하이라이트 적용 (전역 순위 사용)
+                found_product_with_global_rank = found_product.copy()
+                found_product_with_global_rank['rank'] = min_rank  # 전역 순위로 덮어쓰기
+
                 self._highlight_product(
                     element=product_info['element'],
-                    product_data=found_product,
+                    product_data=found_product_with_global_rank,
                     match_condition=match_condition
                 )
 

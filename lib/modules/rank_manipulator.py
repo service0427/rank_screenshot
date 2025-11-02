@@ -343,32 +343,34 @@ class RankManipulator:
         DOM 재배치 후 순위 워터마크 재정립
 
         전략:
-        1. 기존 1~10등 워터마크 백업 (첫 번째 상품에서 스타일 추출)
-        2. 모든 상품에서 워터마크 제거
-        3. 새로운 1~10등 위치에 워터마크 재생성
+        1. DOM에서 현재 순서대로 상품 가져오기 (재배치 후 상태)
+        2. 현재 순서에서 워터마크 백업
+        3. 모든 상품에서 워터마크 제거
+        4. 위치 기반으로 1~10등 워터마크 재생성
 
         Args:
-            all_products: 재배치 전 상품 리스트 (DOM 순서는 이미 변경됨)
+            all_products: 재배치 전 상품 리스트 (사용하지 않음, 인터페이스 호환성)
         """
         try:
             print(f"\n🔄 순위 워터마크 재정립 시작...")
 
-            # Step 1: 워터마크 샘플 백업 (1등 상품에서 스타일 추출)
-            watermark_style = self._backup_watermark_style(all_products)
+            # Step 1: DOM에서 현재 순서대로 상품 다시 가져오기 (재배치 후 상태)
+            structure = self.finder.analyze_product_list_structure()
+            current_order_elements = structure['organic_products']  # 현재 DOM 순서
+            current_order_dicts = [{'element': elem} for elem in current_order_elements]
+
+            # Step 2: 현재 순서에서 워터마크 백업 (재배치 후 상태)
+            watermark_style = self._backup_watermark_style(current_order_dicts)
 
             if not watermark_style:
                 print(f"   ⚠️  워터마크 스타일을 찾을 수 없습니다 - 재정립 건너뜀")
                 return
 
-            # Step 2: 모든 기존 워터마크 제거
-            removed_count = self._remove_all_watermarks(all_products)
+            # Step 3: 모든 기존 워터마크 제거
+            removed_count = self._remove_all_watermarks(current_order_dicts)
             print(f"   ✓ {removed_count}개 기존 워터마크 제거 완료")
 
-            # Step 3: DOM에서 현재 순서대로 상품 다시 가져오기
-            structure = self.finder.analyze_product_list_structure()
-            current_order_elements = structure['organic_products']  # 현재 DOM 순서
-
-            # Step 4: 새로운 1~10등에 워터마크 재생성
+            # Step 4: 위치 기반으로 1~10등 워터마크 재생성
             created_count = self._create_new_watermarks(
                 current_order_elements[:10],  # 상위 10개만
                 watermark_style

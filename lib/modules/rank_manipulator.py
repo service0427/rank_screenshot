@@ -110,7 +110,7 @@ class RankManipulator:
         Args:
             all_products: 전체 일반 상품 리스트 (광고 제외)
             target_product: 이동할 상품
-            current_rank: 현재 순위 (1-based)
+            current_rank: 현재 순위 (1-based, 전역 순위)
             desired_rank: 목표 순위 (1-based)
 
         Returns:
@@ -119,8 +119,21 @@ class RankManipulator:
         # 리스트 복사 (원본 유지)
         reordered = all_products.copy()
 
-        # 현재 위치에서 제거 (1-based → 0-based)
-        reordered.pop(current_rank - 1)
+        # target_product가 현재 페이지의 all_products에 있는지 확인
+        # (다른 페이지에서 가져온 경우 없을 수 있음)
+        local_index = -1
+        for i, product in enumerate(reordered):
+            if product.get('product_id') == target_product.get('product_id'):
+                local_index = i
+                break
+
+        if local_index >= 0:
+            # 현재 페이지에 있는 경우: 현재 위치에서 제거
+            print(f"   📍 상품이 현재 페이지에 존재 (로컬 위치: {local_index + 1})")
+            reordered.pop(local_index)
+        else:
+            # 다른 페이지에서 가져온 경우: 제거 없이 바로 삽입
+            print(f"   📍 다른 페이지에서 상품을 가져옴 (전역 순위: {current_rank}등)")
 
         # 목표 위치에 삽입 (1-based → 0-based)
         reordered.insert(desired_rank - 1, target_product)

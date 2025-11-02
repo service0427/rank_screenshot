@@ -656,9 +656,13 @@ class SearchWorkflow:
                     print(f"\n⚠️  현재 순위({current_rank}등)와 목표 순위({desired_rank_in_page}등)가 다릅니다")
                     print(f"🔀 순위 조작을 시작합니다...")
 
-                    # 순위 조작 실행 (all_products_params 사용 - 딕셔너리 리스트)
+                    # 순위 조작 실행 (페이지 내 로컬 순위 사용)
+                    # target_product의 rank를 페이지 내 순위로 덮어쓰기
+                    target_product_local_rank = found_product.copy()
+                    target_product_local_rank['rank'] = current_rank  # 페이지 내 로컬 순위
+
                     success, error_msg = self.rank_manipulator.move_product_to_rank(
-                        target_product=found_product,
+                        target_product=target_product_local_rank,
                         desired_rank=desired_rank_in_page,
                         all_products=all_products_params
                     )

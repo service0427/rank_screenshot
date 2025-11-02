@@ -323,69 +323,6 @@ class SearchWorkflow:
                 cumulative_rank_offset += len(all_products_params)
                 print(f"   📊 누적 오프셋 업데이트: {cumulative_rank_offset} (현재 페이지 +{len(all_products_params)})")
 
-                # Edit 모드에서 1~2페이지 탐색 후 상품을 찾지 못한 경우
-                # (edit2는 제외 - 순차 탐색 유지)
-                if self.enable_rank_manipulation and self.edit_mode != "edit2" and current_page == 2 and min_rank:
-                    print(f"\n{'=' * 60}")
-                    print(f"⚡ Edit 모드: 1~2페이지에서 상품 미발견")
-                    print(f"{'=' * 60}\n")
-                    print(f"   목표 순위: {min_rank}등")
-                    print(f"   직접 페이지 계산 및 이동 시도...\n")
-
-                    # 평균 27개/페이지로 계산하여 목표 페이지 결정
-                    PRODUCTS_PER_PAGE = 27
-                    target_page = math.ceil(min_rank / PRODUCTS_PER_PAGE)
-
-                    print(f"   📐 계산된 목표 페이지: {target_page} (순위 {min_rank} ÷ {PRODUCTS_PER_PAGE} = {min_rank / PRODUCTS_PER_PAGE:.2f})")
-
-                    # 현재 URL에서 traceId 추출
-                    current_url = self.driver.current_url
-                    trace_id_match = re.search(r'traceId=([^&]+)', current_url)
-
-                    if trace_id_match:
-                        trace_id = trace_id_match.group(1)
-                        print(f"   ✓ traceId 추출 성공: {trace_id}")
-
-                        # 직접 페이지 URL 생성
-                        direct_url = f"https://www.coupang.com/np/search?q={keyword}&traceId={trace_id}&channel=user&page={target_page}"
-                        print(f"   🔗 직접 이동 URL: {direct_url}\n")
-
-                        # 페이지 이동
-                        print(f"   🚀 페이지 {target_page}로 직접 이동 중...")
-                        self.driver.get(direct_url)
-                        time.sleep(3)  # 로딩 대기
-
-                        # 페이지 로딩 대기
-                        self._wait_for_page_load()
-
-                        # 상품 목록 추출
-                        structure = self.finder.analyze_product_list_structure()
-                        organic_products = structure["organic_products"]
-
-                        if organic_products:
-                            print(f"   ✅ 페이지 {target_page} 로드 완료 ({len(organic_products)}개 상품)\n")
-
-                            # 현재 페이지 번호와 누적 오프셋 업데이트
-                            current_page = target_page
-                            cumulative_rank_offset = (target_page - 1) * PRODUCTS_PER_PAGE
-
-                            # ⚠️ 중요: all_products_params도 업데이트 (안 하면 빈 리스트 검색!)
-                            all_products_params = self.finder.extract_all_products_params(organic_products)
-                            print(f"   🔄 all_products_params 업데이트: {len(all_products_params)}개 상품\n")
-
-                            # 다음 루프에서 이 페이지를 검색하도록 continue
-                            continue
-                        else:
-                            print(f"   ⚠️  페이지 {target_page}에 상품이 없습니다")
-                            print(f"   Edit 모드 종료 (1~2페이지에서 발견 못함)\n")
-                            result.error_message = f"Edit 모드: 1~2페이지 및 계산된 페이지({target_page})에서 상품 미발견"
-                            return result
-                    else:
-                        print(f"   ⚠️  traceId 추출 실패 - URL: {current_url}")
-                        print(f"   Edit 모드 종료 (1~2페이지에서 발견 못함)\n")
-                        result.error_message = "Edit 모드: 1~2페이지에서 상품 미발견 (traceId 추출 실패)"
-                        return result
-
                 if current_page >= max_pages:
                     print(f"\n❌ 최대 페이지({max_pages})까지 탐색했으나 상품을 찾지 못했습니다\n")
                     break

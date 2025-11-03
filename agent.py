@@ -323,20 +323,41 @@ def run_agent_selenium_uc(
                 if result.success and hasattr(result, 'matched_product') and result.matched_product:
                     rank = result.matched_product.get('rank')
 
-                # 매칭 조건 추출
-                match_condition = None
-                if result.success and hasattr(result, 'match_condition'):
-                    match_condition = result.match_condition
+                # 매칭 조건에 따라 실제로 일치한 필드만 전달
+                api_product_id = None
+                api_item_id = None
+                api_vendor_item_id = None
+
+                if result.success and hasattr(result, 'match_condition') and result.match_condition:
+                    match_cond = result.match_condition
+
+                    if "완전 일치" in match_cond:
+                        # 모두 일치
+                        api_product_id = product_id
+                        api_item_id = item_id
+                        api_vendor_item_id = vendor_item_id
+                    elif "product_id + vendor_item_id 일치" in match_cond:
+                        # product_id + vendor_item_id만 일치
+                        api_product_id = product_id
+                        api_vendor_item_id = vendor_item_id
+                    elif "product_id 일치" in match_cond:
+                        # product_id만 일치
+                        api_product_id = product_id
+                    elif "vendor_item_id 일치" in match_cond:
+                        # vendor_item_id만 일치
+                        api_vendor_item_id = vendor_item_id
+                    elif "item_id 일치" in match_cond:
+                        # item_id만 일치
+                        api_item_id = item_id
 
                 submit_success = api_client.submit_result(
                     work_id=work_id,
                     screenshot_url=screenshot_url,
                     keyword=keyword,
                     rank=rank,
-                    product_id=product_id,
-                    item_id=item_id,
-                    vendor_item_id=vendor_item_id,
-                    match_condition=match_condition,
+                    product_id=api_product_id,
+                    item_id=api_item_id,
+                    vendor_item_id=api_vendor_item_id,
                     filename=filename
                 )
 

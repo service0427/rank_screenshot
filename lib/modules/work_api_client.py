@@ -221,7 +221,6 @@ except Exception as e:
         product_id: str = None,
         item_id: str = None,
         vendor_item_id: str = None,
-        match_condition: str = None,
         filename: str = None
     ) -> bool:
         """
@@ -232,10 +231,9 @@ except Exception as e:
             screenshot_url: 업로드된 스크린샷 URL
             keyword: 검색 키워드
             rank: 발견된 순위 (전체 누적 순위)
-            product_id: 상품 ID
-            item_id: 아이템 ID
-            vendor_item_id: 판매자 아이템 ID
-            match_condition: 매칭 조건 (예: "product_id 일치", "완전 일치")
+            product_id: 상품 ID (매칭된 경우만, 아니면 None)
+            item_id: 아이템 ID (매칭된 경우만, 아니면 None)
+            vendor_item_id: 판매자 아이템 ID (매칭된 경우만, 아니면 None)
             filename: 스크린샷 파일명
 
         Returns:
@@ -247,8 +245,8 @@ except Exception as e:
             print(f"   - 스크린샷 URL: {screenshot_url}")
             if rank:
                 print(f"   - 순위: {rank}위")
-            if match_condition:
-                print(f"   - 매칭 조건: {match_condition}")
+            if product_id or item_id or vendor_item_id:
+                print(f"   - 매칭 필드: product_id={product_id}, item_id={item_id}, vendor_item_id={vendor_item_id}")
 
             payload = {
                 "id": work_id,
@@ -258,7 +256,6 @@ except Exception as e:
                 "product_id": product_id,
                 "item_id": item_id,
                 "vendor_item_id": vendor_item_id,
-                "match_condition": match_condition,
                 "filename": filename
             }
 

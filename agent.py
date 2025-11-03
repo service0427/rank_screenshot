@@ -490,28 +490,41 @@ def run_work_api_mode(
     return success
 
 
+def scan_chrome_versions() -> dict:
+    """chrome-version/ 폴더를 스캔하여 설치된 버전 목록 반환"""
+    chrome_dir = Path(__file__).parent / "chrome-version"
+    versions = {}
+
+    if not chrome_dir.exists():
+        return versions
+
+    for version_dir in chrome_dir.iterdir():
+        if version_dir.is_dir():
+            chrome_bin = version_dir / "chrome-linux64" / "chrome"
+            if chrome_bin.exists():
+                versions[version_dir.name] = str(chrome_bin)
+
+    return versions
+
+
 def get_random_chrome_version() -> str:
     """설치된 Chrome 버전 중 랜덤으로 선택"""
-    from multi_browser_manager import BrowserVersionManager
     import random
 
-    manager = BrowserVersionManager()
-    if not manager.chrome_versions:
+    versions = scan_chrome_versions()
+    if not versions:
         print("\n❌ Chrome이 설치되어 있지 않습니다!")
         return None
 
-    all_versions = list(manager.chrome_versions.keys())
-    selected = random.choice(all_versions)
+    selected = random.choice(list(versions.keys()))
     print(f"🎲 랜덤 버전 선택: Chrome {selected}")
     return selected
 
 
 def select_chrome_version() -> str:
     """Chrome 버전 선택 인터랙티브 모드"""
-    from multi_browser_manager import BrowserVersionManager
-
-    manager = BrowserVersionManager()
-    if not manager.chrome_versions:
+    versions = scan_chrome_versions()
+    if not versions:
         print("\n❌ Chrome이 설치되어 있지 않습니다!")
         return None
 
@@ -522,8 +535,8 @@ def select_chrome_version() -> str:
     print("=" * 60)
 
     # 버전 리스트 정렬
-    numeric_versions = [v for v in manager.chrome_versions.keys() if v not in ['beta', 'dev', 'canary']]
-    channel_versions = [v for v in manager.chrome_versions.keys() if v in ['beta', 'dev', 'canary']]
+    numeric_versions = [v for v in versions.keys() if v not in ['beta', 'dev', 'canary']]
+    channel_versions = [v for v in versions.keys() if v in ['beta', 'dev', 'canary']]
 
     try:
         numeric_versions.sort(key=lambda x: int(x))

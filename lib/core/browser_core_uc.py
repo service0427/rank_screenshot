@@ -20,7 +20,6 @@ except ImportError:
 
 from ..constants import Config
 from ..utils.network_filter import NetworkFilter
-from multi_browser_manager import BrowserVersionManager
 
 
 class BrowserCoreUC:
@@ -39,9 +38,6 @@ class BrowserCoreUC:
         self.shared_cache_dir = Path(Config.PROFILE_DIR_BASE) / "shared-cache"
         self.shared_cache_dir.mkdir(parents=True, exist_ok=True)
 
-        # Browser version manager
-        self.version_manager = BrowserVersionManager()
-
         # Network filter (광고/트래킹 차단)
         self.network_filter = NetworkFilter()
 
@@ -56,6 +52,22 @@ class BrowserCoreUC:
             "instances_closed": 0,
             "active": False
         }
+
+    def _scan_chrome_versions(self) -> dict:
+        """chrome-version/ 폴더를 스캔하여 설치된 버전 목록 반환"""
+        chrome_dir = Path(__file__).parent.parent.parent / "chrome-version"
+        versions = {}
+
+        if not chrome_dir.exists():
+            return versions
+
+        for version_dir in chrome_dir.iterdir():
+            if version_dir.is_dir():
+                chrome_bin = version_dir / "chrome-linux64" / "chrome"
+                if chrome_bin.exists():
+                    versions[version_dir.name] = str(chrome_bin)
+
+        return versions
 
     def get_chrome_options(self, use_profile: bool = True, window_position: str = None, enable_network_filter: bool = False):
         """
@@ -195,11 +207,18 @@ class BrowserCoreUC:
                 # Keep version as channel name for profile directory
             else:
                 # Regular version number
-                chrome_path = self.version_manager.get_chrome(version)
+                versions = self._scan_chrome_versions()
+                chrome_path = versions.get(version)
                 if not chrome_path:
                     raise ValueError(f"Chrome {version} not found")
         else:
-            version, chrome_path = self.version_manager.get_random_chrome()
+            # Random version
+            import random
+            versions = self._scan_chrome_versions()
+            if not versions:
+                raise ValueError("Chrome이 설치되어 있지 않습니다")
+            version = random.choice(list(versions.keys()))
+            chrome_path = versions[version]
 
         # 버전별 + 사용자별 프로필 디렉토리 설정
         # 우선순위 (소유권 문제 해결):

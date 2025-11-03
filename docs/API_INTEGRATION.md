@@ -25,14 +25,20 @@ Coupang Agent V2는 이제 작업 할당 API와 결과 제출 API를 지원합�
 ```
 
 ### 2. 작업 결과 제출 API
-- **URL**: `http://localhost:3302/api/work/screenshot-result`
+- **URL**: `http://61.84.75.37:3302/api/work/screenshot-result`
 - **Method**: POST
 - **Content-Type**: application/json
 - **Request Body**:
 ```json
 {
   "id": 4948534,
-  "screenshot_url": "https://example.com/screenshot.png"
+  "screenshot_url": "https://example.com/screenshot.png",
+  "keyword": "사운드바",
+  "rank": 7,
+  "product_id": "7227655664",
+  "item_id": "18331882647",
+  "vendor_item_id": "85810785808",
+  "filename": "123456_사운드바_7227655664_18331882647_85810785808.png"
 }
 ```
 - **Response**:
@@ -42,6 +48,11 @@ Coupang Agent V2는 이제 작업 할당 API와 결과 제출 API를 지원합�
   "message": "Result submitted successfully"
 }
 ```
+
+**⚠️ 상세 명세**: [WORK_RESULT_API_SPEC.md](WORK_RESULT_API_SPEC.md) 참고
+- 7가지 케이스별 Request 예제
+- 매칭 조건별 필드 설명
+- 서버 구현 가이드 포함
 
 ## 사용 방법
 
@@ -269,6 +280,13 @@ A:
 - 예: `python3 agent.py --work-api --version 134 --vpn 1`
 
 ## 변경 이력
+
+### 2025-11-03
+- ✅ 작업 결과 제출 API에 추가 메타데이터 포함
+  - `keyword`, `rank`, `filename` 필드 추가
+  - `product_id`, `item_id`, `vendor_item_id` 필드 추가 (매칭된 것만 값)
+  - `match_condition` 필드 제거 (각 필드의 null 여부로 판별)
+- ✅ 상세 API 명세서 작성 ([WORK_RESULT_API_SPEC.md](WORK_RESULT_API_SPEC.md))
 
 ### 2025-11-02
 - 작업 API 통합 구현

@@ -609,20 +609,26 @@ class SearchWorkflow:
 
             self.finder.scroll_to_center(product_info)
 
-            # 스크린샷 전 최종 안정화 대기
-            print("\n" + "=" * 60)
-            print("📸 변경 전 스크린샷 캡처 (하이라이트 없음)")
-            print("=" * 60 + "\n")
-            self._wait_for_page_load()
+            # Edit 모드가 아닌 경우에만 변경 전 스크린샷 촬영
+            if not self.enable_rank_manipulation:
+                # 스크린샷 전 최종 안정화 대기
+                print("\n" + "=" * 60)
+                print("📸 변경 전 스크린샷 캡처 (하이라이트 없음)")
+                print("=" * 60 + "\n")
+                self._wait_for_page_load()
 
-            # 스크린샷 + 오버레이 + 업로드 (하이라이트 없는 상태로)
-            result.before_screenshot, result.before_screenshot_url = self.screenshot_processor.capture_with_overlay(
-                keyword=keyword,
-                version=version,
-                overlay_text="",  # 오버레이 텍스트 제거 (썸네일에 P/I/V로 표시)
-                full_page=False,
-                metadata=self._create_metadata(keyword, product_info)
-            )
+                # 스크린샷 + 오버레이 + 업로드 (하이라이트 없는 상태로)
+                result.before_screenshot, result.before_screenshot_url = self.screenshot_processor.capture_with_overlay(
+                    keyword=keyword,
+                    version=version,
+                    overlay_text="",  # 오버레이 텍스트 제거 (썸네일에 P/I/V로 표시)
+                    full_page=False,
+                    metadata=self._create_metadata(keyword, product_info)
+                )
+            else:
+                print("\n" + "=" * 60)
+                print("ℹ️  Edit 모드: 변경 전 스크린샷 건너뛰기")
+                print("=" * 60 + "\n")
 
             # 9. Edit 모드에서 순위 변환 (같은 페이지 내에서만)
             desired_rank_in_page = min_rank  # 기본값 (Edit 모드가 아닌 경우)

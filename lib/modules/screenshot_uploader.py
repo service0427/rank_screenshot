@@ -113,8 +113,7 @@ class ScreenshotUploader:
                     import json
                     print(f"   📋 전송 데이터:")
                     print(f"      파일: {filepath.name}")
-                    for key, value in data.items():
-                        print(f"      {key}: {value}")
+                    print(f"      데이터: {json.dumps(data, ensure_ascii=False, indent=2)}")
 
                     # POST 요청
                     response = requests.post(

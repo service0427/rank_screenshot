@@ -23,17 +23,22 @@ echo "🔧 Agent 권한 설정"
 echo "============================================================"
 echo ""
 
-# 현재 사용자 확인
-CURRENT_USER=$(whoami)
-log_info "Current user: $CURRENT_USER"
+# 현재 사용자 확인 (sudo로 실행되어도 실제 사용자 감지)
+if [ -n "$SUDO_USER" ]; then
+    CURRENT_USER="$SUDO_USER"
+    log_info "Detected sudo execution, actual user: $CURRENT_USER"
+else
+    CURRENT_USER=$(whoami)
+    log_info "Current user: $CURRENT_USER"
+fi
 
-# 스크립트 디렉토리 확인
+# 스크립트 디렉토리 확인 (agent 소유자의 디렉토리)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 log_info "Agent directory: $SCRIPT_DIR"
 
-# 홈 디렉토리 확인
+# Agent 소유자의 홈 디렉토리 확인
 HOME_DIR=$(eval echo ~$CURRENT_USER)
-log_info "Home directory: $HOME_DIR"
+log_info "Agent owner home directory: $HOME_DIR"
 
 # ===================================================================
 # 1. Agent 디렉토리 권한 설정

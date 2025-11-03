@@ -34,10 +34,6 @@ class BrowserCoreUC:
         self.driver = None
         self.profile_dir = None  # launch()에서 버전별로 설정
 
-        # 공유 캐시 디렉토리 (모든 버전이 공유)
-        self.shared_cache_dir = Path(Config.PROFILE_DIR_BASE) / "shared-cache"
-        self.shared_cache_dir.mkdir(parents=True, exist_ok=True)
-
         # Network filter (광고/트래킹 차단)
         self.network_filter = NetworkFilter()
 
@@ -122,10 +118,6 @@ class BrowserCoreUC:
         # 한국어 설정
         options.add_argument("--lang=ko-KR")
         options.add_argument("--accept-lang=ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7")
-
-        # 공유 캐시 디렉토리 (모든 버전이 공유)
-        options.add_argument(f"--disk-cache-dir={self.shared_cache_dir}")
-        options.add_argument("--disk-cache-size=524288000")  # 500MB
 
         # 시크릿 모드 (프로필 사용 시 비활성화 - Chrome 131+ 호환성)
         # options.add_argument("--incognito")
@@ -651,49 +643,6 @@ class BrowserCoreUC:
             shutil.rmtree(self.profile_dir)
             self.profile_dir.mkdir(parents=True, exist_ok=True)
             print(f"   ✓ Profile cleaned")
-
-    def clean_old_cache(self, max_age_hours: int = 72):
-        """
-        72시간 이상 사용되지 않은 캐시 파일 정리
-
-        Args:
-            max_age_hours: 최대 캐시 유지 시간 (기본: 72시간)
-        """
-        if not self.shared_cache_dir.exists():
-            return
-
-        print(f"🧹 Cleaning cache older than {max_age_hours} hours...")
-
-        current_time = time.time()
-        max_age_seconds = max_age_hours * 3600
-        removed_count = 0
-        removed_size = 0
-
-        try:
-            for root, dirs, files in os.walk(self.shared_cache_dir):
-                for file in files:
-                    file_path = Path(root) / file
-                    try:
-                        # 마지막 접근 시간 확인
-                        last_access_time = file_path.stat().st_atime
-                        age = current_time - last_access_time
-
-                        if age > max_age_seconds:
-                            file_size = file_path.stat().st_size
-                            file_path.unlink()
-                            removed_count += 1
-                            removed_size += file_size
-                    except Exception:
-                        continue
-
-            if removed_count > 0:
-                size_mb = removed_size / (1024 * 1024)
-                print(f"   ✓ Removed {removed_count} files ({size_mb:.2f} MB)")
-            else:
-                print(f"   ✓ No old cache to clean")
-
-        except Exception as e:
-            print(f"   ⚠️  Cache cleaning failed: {e}")
 
     def take_screenshot(
         self,

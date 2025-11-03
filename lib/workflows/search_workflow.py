@@ -618,19 +618,25 @@ class SearchWorkflow:
                 }
                 self.finder.scroll_to_center(temp_product_info)
 
-                # 스크린샷 캡처
+                # 스크린샷 캡처 (워터마크 표시 포함)
                 print("\n" + "=" * 60)
                 print(f"📸 스크린샷 캡처 (목표 순위 {min_rank}등 위치)")
                 print("=" * 60 + "\n")
                 self._wait_for_page_load()
 
-                result.before_screenshot, result.before_screenshot_url = self.screenshot_processor.capture_with_overlay(
+                # 워터마크 표시 후 스크린샷 캡처 (before_screenshot로 저장)
+                temp_result = type('obj', (object,), {
+                    'found_on_page': result.found_on_page,
+                    'page_history': result.page_history
+                })()
+                self._display_watermark_and_capture(
                     keyword=keyword,
                     version=version,
-                    overlay_text="",
-                    full_page=False,
-                    metadata=self._create_metadata(keyword, temp_product_info)
+                    product_info=temp_product_info,
+                    result=temp_result
                 )
+                result.before_screenshot = temp_result.after_screenshot
+                result.before_screenshot_url = temp_result.after_screenshot_url
 
                 # Edit 모드에서 다른 페이지로 이동한 경우 순위 조작 불필요
                 print(f"\n✅ Edit 모드 완료: P/I/V 덮어씌우기 + 워터마크 제거 + 스크린샷 캡처")

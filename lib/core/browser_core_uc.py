@@ -282,7 +282,7 @@ class BrowserCoreUC:
             if fresh_profile:
                 print(f"   Mode: Fresh profile (완전 삭제 후 재생성)")
             else:
-                print(f"   Mode: Reuse profile (쿠키/세션/스토리지만 삭제 예정)")
+                print(f"   Mode: Reuse profile (쿠키/세션/스토리지 삭제됨)")
 
         # Chrome 옵션
         # 프로필 사용 시: 저장된 창 위치 자동 복원 (window_position 인자 없음)
@@ -375,6 +375,11 @@ class BrowserCoreUC:
 
         print(f"   ✓ Chrome launched (undetected-chromedriver)")
         print(f"   ✓ Anti-detection: ENABLED by default")
+
+        # 프로필 재사용 시 쿠키/세션/로컬스토리지 삭제
+        if use_profile and not fresh_profile:
+            print()  # 빈 줄
+            self.clear_all_storage()
 
         return self.driver
 

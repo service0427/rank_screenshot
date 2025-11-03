@@ -91,9 +91,14 @@ except Exception as e:
     sys.exit(1)
 """
 
-            # subprocess로 로컬 Python 실행 (VPN 우회)
+            # 원본 사용자 확인 (VPN 환경에서는 HOME 환경 변수에서 원본 사용자 추출)
+            original_user = os.environ.get('HOME', '/home/tech').split('/')[-1]
+
+            # subprocess로 원본 사용자로 Python 실행 (VPN 라우팅 완전 우회)
+            cmd = ['sudo', '-u', original_user, 'python3', '-c', script]
+
             result = subprocess.run(
-                ['python3', '-c', script],
+                cmd,
                 capture_output=True,
                 text=True,
                 timeout=timeout + 5  # 여유 시간 추가

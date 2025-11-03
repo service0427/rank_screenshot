@@ -200,14 +200,35 @@ class BrowserCoreUC:
             version, chrome_path = self.version_manager.get_random_chrome()
 
         # 버전별 + 사용자별 프로필 디렉토리 설정
+        # 우선순위 (소유권 문제 해결):
+        # 1. VPN + instance: instance + VPN 조합 (run_workers.py 멀티워커 + VPN 랜덤)
+        # 2. VPN만: vpn 번호 기반 (레거시, 직접 실행)
+        # 3. 일반 + 멀티 instance: instance 기반
+        # 4. 일반 + 단일: 공통 프로필
         vpn_num = os.getenv('VPN_EXECUTED')
-        if vpn_num:
-            # VPN 사용 시 독립 프로필
+        if vpn_num and self.instance_id >= 1:
+            # VPN + instance 조합: 소유권 충돌 방지를 위해 instance+VPN 모두 사용
+            # run_workers.py에서 VPN 랜덤 선택 시 같은 instance가 다른 VPN으로 실행될 수 있음
+            self.profile_dir = Path(Config.PROFILE_DIR_BASE) / f"instance-{self.instance_id}-vpn{vpn_num}-chrome-{version}"
+        elif vpn_num:
+            # VPN만 (직접 실행): vpn 번호 기반 (레거시)
             self.profile_dir = Path(Config.PROFILE_DIR_BASE) / f"vpn{vpn_num}-chrome-{version}"
+        elif self.instance_id > 1:
+            # 일반 + 멀티 인스턴스: instance 기반
+            self.profile_dir = Path(Config.PROFILE_DIR_BASE) / f"instance-{self.instance_id}-chrome-{version}"
         else:
-            # 일반 사용자는 기존 방식
+            # 일반 + 단일: 공통 프로필
             self.profile_dir = Path(Config.PROFILE_DIR_BASE) / f"chrome-{version}"
+
+        # 프로필 디렉토리 생성 및 권한 설정
         self.profile_dir.mkdir(parents=True, exist_ok=True)
+        # VPN 사용자도 읽기/쓰기 가능하도록 권한 설정 (rwxrwxrwx)
+        # instance 기반 프로필은 여러 VPN 사용자가 공유할 수 있음
+        try:
+            import stat
+            self.profile_dir.chmod(stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
+        except Exception:
+            pass  # 권한 설정 실패해도 계속 진행
 
         print(f"🚀 Launching Chrome {version} with undetected-chromedriver...")
         print(f"   Path: {chrome_path}")

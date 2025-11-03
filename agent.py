@@ -315,7 +315,6 @@ def run_agent_selenium_uc(
                     screenshot_url = "PRODUCT_NOT_FOUND"
 
                 # 파일명 추출 (URL에서 파일명만)
-                from pathlib import Path
                 filename = Path(screenshot_url).name if screenshot_url and screenshot_url != "PRODUCT_NOT_FOUND" else None
 
                 # 순위 정보 추출

@@ -752,7 +752,7 @@ class SearchWorkflow:
                     # 페이지 안정화 대기
                     self._wait_for_page_load()
 
-                    # 변경 후 스크린샷 캡처
+                    # 변경 후 스크린샷 캡처 (워터마크 표시 포함)
                     print(f"\n{'=' * 60}")
                     if self.enable_rank_manipulation and found_on_page and target_page_info:
                         print(f"📸 순위 변경 후 스크린샷 캡처 (전체 순위: {min_rank}등, 페이지 내: {desired_rank_in_page}등)")
@@ -760,12 +760,11 @@ class SearchWorkflow:
                         print(f"📸 순위 변경 후 스크린샷 캡처 (새 위치: {min_rank}등)")
                     print(f"{'=' * 60}\n")
 
-                    result.after_screenshot, result.after_screenshot_url = self.screenshot_processor.capture_with_overlay(
+                    self._display_watermark_and_capture(
                         keyword=keyword,
                         version=version,
-                        overlay_text="",
-                        full_page=False,
-                        metadata=self._create_metadata(keyword, updated_product_info)
+                        product_info=updated_product_info,
+                        result=result
                     )
 
                 else:
@@ -791,13 +790,12 @@ class SearchWorkflow:
                     self.finder.scroll_to_center(product_info)
                     self._wait_for_page_load()
 
-                    # "after" 스크린샷 (하이라이트 적용된 상태)
-                    result.after_screenshot, result.after_screenshot_url = self.screenshot_processor.capture_with_overlay(
+                    # "after" 스크린샷 캡처 (워터마크 표시 포함)
+                    self._display_watermark_and_capture(
                         keyword=keyword,
                         version=version,
-                        overlay_text="",
-                        full_page=False,
-                        metadata=self._create_metadata(keyword, product_info)
+                        product_info=product_info,
+                        result=result
                     )
 
             else:
@@ -820,59 +818,12 @@ class SearchWorkflow:
                 self.finder.scroll_to_center(product_info)
                 self._wait_for_page_load()
 
-                # 워터마크 표시 (11등 이상의 상품에만)
-                try:
-                    # 현재 페이지의 모든 상품 조회
-                    all_items = self.driver.find_elements("css selector", "#product-list > li[data-id]")
-                    if not all_items:
-                        all_items = self.driver.find_elements("css selector", "#product-list > li")
-
-                    # 각 상품의 광고 여부 및 순위 정보 수집
-                    items_info = []
-                    organic_count = 0  # 일반 상품 카운터
-                    for idx, item in enumerate(all_items):
-                        is_ad = self.finder._is_ad_element(item)
-                        if not is_ad:
-                            organic_count += 1
-                        items_info.append({
-                            "is_ad": is_ad,
-                            "dom_index": idx,
-                            "rank": organic_count if not is_ad else None  # 광고 제외한 실제 순위
-                        })
-
-                    # rank_offset 계산 (이전 페이지들의 실제 일반 상품 개수 누적)
-                    current_page = result.found_on_page if result.found_on_page else 1
-                    rank_offset = 0
-
-                    # page_history에서 이전 페이지들의 실제 상품 개수 합산
-                    if hasattr(result, 'page_history') and result.page_history:
-                        for page_info in result.page_history:
-                            if page_info['page'] < current_page:
-                                rank_offset += page_info['product_count']
-                    else:
-                        # page_history 없으면 추정값 사용 (비권장)
-                        rank_offset = (current_page - 1) * 40
-
-                    # 워터마크 표시
-                    self.watermark_display.display_watermarks_for_page(
-                        all_items=all_items,
-                        items_info=items_info,
-                        rank_offset=rank_offset
-                    )
-
-                    # 워터마크 표시 후 안정화
-                    time.sleep(0.3)
-
-                except Exception as e:
-                    print(f"⚠️  워터마크 표시 중 오류 (계속 진행): {e}")
-
-                # "after" 스크린샷 (하이라이트 적용된 상태)
-                result.after_screenshot, result.after_screenshot_url = self.screenshot_processor.capture_with_overlay(
+                # "after" 스크린샷 캡처 (워터마크 표시 포함)
+                self._display_watermark_and_capture(
                     keyword=keyword,
                     version=version,
-                    overlay_text="",
-                    full_page=False,
-                    metadata=self._create_metadata(keyword, product_info)
+                    product_info=product_info,
+                    result=result
                 )
 
             # 10. Edit 모드 종합 로그
@@ -968,6 +919,89 @@ class SearchWorkflow:
             print(f"⚠️  페이지 로딩 대기 실패: {e}")
             # 실패해도 2초는 대기
             time.sleep(2)
+            return False
+
+    def _display_watermark_and_capture(
+        self,
+        keyword: str,
+        version: str,
+        product_info: Dict,
+        result: 'SearchWorkflowResult'
+    ) -> bool:
+        """
+        워터마크 표시 후 스크린샷 캡처 (공통 함수)
+
+        Args:
+            keyword: 검색 키워드
+            version: Chrome 버전
+            product_info: 상품 정보 딕셔너리
+            result: SearchWorkflowResult 객체 (스크린샷 저장용)
+
+        Returns:
+            성공 여부
+        """
+        try:
+            # 1. 워터마크 표시 (11등 이상의 상품에만)
+            try:
+                # 현재 페이지의 모든 상품 조회
+                all_items = self.driver.find_elements("css selector", "#product-list > li[data-id]")
+                if not all_items:
+                    all_items = self.driver.find_elements("css selector", "#product-list > li")
+
+                # 각 상품의 광고 여부 및 순위 정보 수집
+                items_info = []
+                organic_count = 0  # 일반 상품 카운터
+                for idx, item in enumerate(all_items):
+                    is_ad = self.finder._is_ad_element(item)
+                    if not is_ad:
+                        organic_count += 1
+                    items_info.append({
+                        "is_ad": is_ad,
+                        "dom_index": idx,
+                        "rank": organic_count if not is_ad else None  # 광고 제외한 실제 순위
+                    })
+
+                # rank_offset 계산 (이전 페이지들의 실제 일반 상품 개수 누적)
+                current_page = result.found_on_page if result.found_on_page else 1
+                rank_offset = 0
+
+                # page_history에서 이전 페이지들의 실제 상품 개수 합산
+                if hasattr(result, 'page_history') and result.page_history:
+                    for page_info in result.page_history:
+                        if page_info['page'] < current_page:
+                            rank_offset += page_info['product_count']
+                else:
+                    # page_history 없으면 추정값 사용 (비권장)
+                    rank_offset = (current_page - 1) * 40
+
+                # 워터마크 표시
+                self.watermark_display.display_watermarks_for_page(
+                    all_items=all_items,
+                    items_info=items_info,
+                    rank_offset=rank_offset
+                )
+
+                # 워터마크 표시 후 안정화
+                time.sleep(0.3)
+
+            except Exception as e:
+                print(f"⚠️  워터마크 표시 중 오류 (계속 진행): {e}")
+
+            # 2. 스크린샷 캡처
+            result.after_screenshot, result.after_screenshot_url = self.screenshot_processor.capture_with_overlay(
+                keyword=keyword,
+                version=version,
+                overlay_text="",
+                full_page=False,
+                metadata=self._create_metadata(keyword, product_info)
+            )
+
+            return True
+
+        except Exception as e:
+            print(f"❌ 워터마크 표시 및 스크린샷 캡처 실패: {e}")
+            import traceback
+            traceback.print_exc()
             return False
 
     def _remove_watermark_from_element(self, element):

@@ -829,12 +829,15 @@ class SearchWorkflow:
 
                     # 각 상품의 광고 여부 및 순위 정보 수집
                     items_info = []
+                    organic_count = 0  # 일반 상품 카운터
                     for idx, item in enumerate(all_items):
                         is_ad = self.finder._is_ad_element(item)
+                        if not is_ad:
+                            organic_count += 1
                         items_info.append({
                             "is_ad": is_ad,
                             "dom_index": idx,
-                            "rank": idx + 1 if not is_ad else None  # 임시 순위
+                            "rank": organic_count if not is_ad else None  # 광고 제외한 실제 순위
                         })
 
                     # rank_offset 계산 (이전 페이지의 일반 상품 개수)

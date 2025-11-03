@@ -840,9 +840,18 @@ class SearchWorkflow:
                             "rank": organic_count if not is_ad else None  # 광고 제외한 실제 순위
                         })
 
-                    # rank_offset 계산 (이전 페이지의 일반 상품 개수)
+                    # rank_offset 계산 (이전 페이지들의 실제 일반 상품 개수 누적)
                     current_page = result.found_on_page if result.found_on_page else 1
-                    rank_offset = (current_page - 1) * 40  # 페이지당 최대 40개 상품
+                    rank_offset = 0
+
+                    # page_history에서 이전 페이지들의 실제 상품 개수 합산
+                    if hasattr(result, 'page_history') and result.page_history:
+                        for page_info in result.page_history:
+                            if page_info['page'] < current_page:
+                                rank_offset += page_info['product_count']
+                    else:
+                        # page_history 없으면 추정값 사용 (비권장)
+                        rank_offset = (current_page - 1) * 40
 
                     # 워터마크 표시
                     self.watermark_display.display_watermarks_for_page(

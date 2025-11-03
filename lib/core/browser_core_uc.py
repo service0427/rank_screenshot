@@ -235,6 +235,9 @@ class BrowserCoreUC:
 
         # 프로필 디렉토리 처리
         # VPN 번호별로 이미 분리되어 있으므로 각 사용자가 자신의 디렉토리만 사용
+        print(f"📁 Profile directory: {self.profile_dir}")
+        print(f"   Creating profile directory...")
+
         if fresh_profile and self.profile_dir.exists():
             # 옵션 1: 프로필 완전 삭제 후 재생성
             import shutil
@@ -245,6 +248,7 @@ class BrowserCoreUC:
         else:
             # 옵션 2 (기본): 프로필 유지
             self.profile_dir.mkdir(parents=True, exist_ok=True)
+            print(f"✅ Profile directory ready")
 
         print(f"🚀 Launching Chrome {version} with undetected-chromedriver...")
         print(f"   Path: {chrome_path}")
@@ -284,6 +288,10 @@ class BrowserCoreUC:
         driver_port = 10000 + self.instance_id
 
         # undetected-chromedriver 시작 (자동 ChromeDriver 다운로드)
+        print(f"   Starting undetected-chromedriver (version_main={version_main})...")
+        print(f"   Driver port: {driver_port}")
+        print(f"   This may take a while if downloading ChromeDriver...")
+
         self.driver = uc.Chrome(
             browser_executable_path=chrome_path,
             options=options,

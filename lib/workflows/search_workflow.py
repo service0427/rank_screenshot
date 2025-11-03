@@ -700,12 +700,6 @@ class SearchWorkflow:
                         return result
 
                     # 9. 변경 후 스크린샷 (새 위치에서 하이라이트 재적용)
-                    print(f"\n{'=' * 60}")
-                    if self.enable_rank_manipulation and found_on_page and target_page_info:
-                        print(f"📸 순위 변경 후 스크린샷 캡처 (전체 순위: {min_rank}등, 페이지 내: {desired_rank_in_page}등)")
-                    else:
-                        print(f"📸 순위 변경 후 스크린샷 캡처 (새 위치: {min_rank}등)")
-                    print(f"{'=' * 60}\n")
 
                     # 새 위치에 하이라이트 재적용 (전역 순위 사용)
                     updated_product_with_global_rank = updated_product.copy()
@@ -732,7 +726,14 @@ class SearchWorkflow:
                     # 페이지 안정화 대기
                     self._wait_for_page_load()
 
-                    # 변경 후 스크린샷 (업데이트된 정보 사용)
+                    # 변경 후 스크린샷 캡처
+                    print(f"\n{'=' * 60}")
+                    if self.enable_rank_manipulation and found_on_page and target_page_info:
+                        print(f"📸 순위 변경 후 스크린샷 캡처 (전체 순위: {min_rank}등, 페이지 내: {desired_rank_in_page}등)")
+                    else:
+                        print(f"📸 순위 변경 후 스크린샷 캡처 (새 위치: {min_rank}등)")
+                    print(f"{'=' * 60}\n")
+
                     result.after_screenshot, result.after_screenshot_url = self.screenshot_processor.capture_with_overlay(
                         keyword=keyword,
                         version=version,

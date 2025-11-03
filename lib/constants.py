@@ -4,6 +4,7 @@ Constants and Status Definitions
 """
 
 from enum import Enum
+from pathlib import Path
 
 
 # ===================================================================
@@ -181,8 +182,8 @@ class Config:
     # Hub Server
     HUB_SERVER_URL = "http://mkt.techb.kr:3001"
 
-    # Browser Profiles
-    PROFILE_DIR_BASE = "/home/tech/agent/browser-profiles"
+    # Browser Profiles (프로젝트 루트 기준 상대 경로)
+    PROFILE_DIR_BASE = str(Path(__file__).parent.parent / "browser-profiles")
 
     # Debug Settings
     DEBUG_MODE = False  # 디버그 모드 (--debug 플래그로 설정됨, 상세 로그 및 파일 저장)

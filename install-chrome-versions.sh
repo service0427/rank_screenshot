@@ -1,497 +1,150 @@
 #!/bin/bash
 
-# Chrome Version Downloader for nodriver
-# Downloads Chrome versions 127 to latest using Chrome for Testing
-# Uses official Google Chrome for Testing repository for stable, long-term downloads
+#######################################
+# Chrome 130, 144 자동 설치 스크립트
+# 실행하면 기존 폴더 확인 후 없으면 자동 설치
+#######################################
 
 set -e
 
-# Colors for output
+# Colors
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-CYAN='\033[0;36m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Base directory for chrome versions
-CHROME_BASE_DIR="/home/tech/agent/chrome-version"
-
-# Chrome for Testing base URL
+# 디렉토리
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+CHROME_BASE_DIR="$SCRIPT_DIR/chrome-version"
 CHROME_FOR_TESTING_URL="https://storage.googleapis.com/chrome-for-testing-public"
 
-# JSON API URL for version information
-VERSION_API_URL="https://googlechromelabs.github.io/chrome-for-testing/latest-versions-per-milestone-with-downloads.json"
-
-# JSON API URL for channel versions (Beta, Dev, Canary)
-CHANNEL_API_URL="https://googlechromelabs.github.io/chrome-for-testing/last-known-good-versions.json"
-
-# Version arrays - will be populated from API or use defaults
-declare -A CHROME_VERSIONS=(
+# 설치할 버전 (major version => full version)
+declare -A VERSIONS=(
     ["130"]="130.0.6723.116"
     ["144"]="144.0.7500.2"
 )
 
-# Function to print colored messages
-print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
+print_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
+print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
+print_warning() { echo -e "${YELLOW}[WARN]${NC} $1"; }
+print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
+# Chrome 다운로드 및 설치
+install_chrome() {
+    local major=$1
+    local version=$2
+    local version_dir="${CHROME_BASE_DIR}/${major}"
 
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Function to fetch latest versions from Chrome for Testing API
-fetch_latest_versions() {
-    print_info "Fetching latest version information from Chrome for Testing API..."
-
-    local json_file="/tmp/chrome-versions.json"
-
-    if wget -q -O "$json_file" "$VERSION_API_URL"; then
-        print_success "Version information fetched successfully"
-
-        # Parse JSON and update version array
-        if command -v jq &> /dev/null; then
-            local milestones=$(jq -r '.milestones | keys[]' "$json_file" 2>/dev/null)
-            for milestone in $milestones; do
-                if [ "$milestone" -ge 127 ]; then
-                    local version=$(jq -r ".milestones[\"$milestone\"].version" "$json_file" 2>/dev/null)
-                    if [ -n "$version" ] && [ "$version" != "null" ]; then
-                        CHROME_VERSIONS["$milestone"]="$version"
-                    fi
-                fi
-            done
-            print_info "Updated versions for milestones 127+"
-        else
-            print_warning "jq not installed, using default version list"
-        fi
-
-        rm -f "$json_file"
-    else
-        print_warning "Failed to fetch version information, using default version list"
-    fi
-}
-
-# Function to download and extract Chrome
-download_chrome() {
-    local version=$1
-    local label="${2:-}"
-
-    # Extract major version number
-    local major_version=$(echo "$version" | cut -d. -f1)
-
-    # Create version directory with label if provided
-    if [ -n "$label" ]; then
-        local version_dir="${CHROME_BASE_DIR}/${major_version}-${label}"
-    else
-        local version_dir="${CHROME_BASE_DIR}/${major_version}"
-    fi
-
-    # Check if already installed
+    # 이미 설치되어 있는지 확인
     if [ -d "$version_dir" ] && [ -f "$version_dir/chrome-linux64/chrome" ]; then
-        print_warning "Chrome ${major_version} (v${version}) already exists at $version_dir"
+        print_success "Chrome ${major} 이미 설치됨: $version_dir"
         return 0
     fi
+
+    print_info "Chrome ${major} (v${version}) 다운로드 중..."
 
     mkdir -p "$version_dir"
 
-    print_info "Downloading Chrome ${major_version} (v${version})..."
-
-    # Construct Chrome for Testing download URL
+    # 다운로드 URL
     local chrome_url="${CHROME_FOR_TESTING_URL}/${version}/linux64/chrome-linux64.zip"
-    local zip_file="/tmp/chrome-${version}.zip"
+    local zip_file="/tmp/chrome-${major}.zip"
 
-    # Download with retry logic
-    local max_retries=3
-    local retry_count=0
-    local download_success=false
-
-    while [ $retry_count -lt $max_retries ]; do
+    # 다운로드 (재시도 3회)
+    local retry=0
+    while [ $retry -lt 3 ]; do
         if wget -q --show-progress "$chrome_url" -O "$zip_file" 2>&1; then
-            download_success=true
             break
+        fi
+        retry=$((retry + 1))
+        if [ $retry -lt 3 ]; then
+            print_warning "다운로드 실패, 재시도 중 ($retry/3)..."
+            sleep 2
         else
-            retry_count=$((retry_count + 1))
-            if [ $retry_count -lt $max_retries ]; then
-                print_warning "Download failed, retrying ($retry_count/$max_retries)..."
-                sleep 2
-            fi
+            print_error "다운로드 실패: $chrome_url"
+            rm -f "$zip_file"
+            return 1
         fi
     done
 
-    if [ "$download_success" = false ]; then
-        print_error "Failed to download Chrome ${major_version} (v${version}) after $max_retries attempts"
-        print_warning "URL: $chrome_url"
-        rm -f "$zip_file"
-        return 1
-    fi
+    print_info "압축 해제 중..."
 
-    print_info "Extracting Chrome ${major_version} (v${version})..."
-
-    # Extract the zip file
+    # 압축 해제
     if command -v unzip &> /dev/null; then
         unzip -q "$zip_file" -d "$version_dir"
-    elif command -v python3 &> /dev/null; then
-        python3 -c "import zipfile; zipfile.ZipFile('$zip_file').extractall('$version_dir')"
     else
-        print_error "Neither unzip nor python3 found. Cannot extract zip file."
+        print_error "unzip이 설치되지 않았습니다: sudo apt-get install unzip"
         rm -f "$zip_file"
         return 1
     fi
 
-    # Clean up zip file
     rm -f "$zip_file"
 
-    # Verify installation
+    # 검증
     if [ -f "$version_dir/chrome-linux64/chrome" ]; then
         echo "$version" > "$version_dir/VERSION"
-        echo "$major_version" > "$version_dir/MAJOR_VERSION"
-
-        # Make chrome executable
         chmod +x "$version_dir/chrome-linux64/chrome"
-
-        print_success "Chrome ${major_version} (v${version}) installed successfully"
-        print_info "Location: $version_dir/chrome-linux64/chrome"
+        print_success "Chrome ${major} 설치 완료: $version_dir"
         return 0
     else
-        print_error "Chrome binary not found after extraction"
+        print_error "Chrome 바이너리를 찾을 수 없습니다"
         return 1
     fi
 }
 
-# Function to download all versions in a range
-download_range() {
-    local start_version=$1
-    local end_version=$2
+# 메인 실행
+echo "============================================================"
+echo "🔧 Chrome 130, 144 자동 설치"
+echo "============================================================"
+echo ""
 
-    print_info "Downloading Chrome versions ${start_version} to ${end_version}..."
-    echo ""
+mkdir -p "$CHROME_BASE_DIR"
 
-    local success_count=0
-    local fail_count=0
-    local total=0
+installed=0
+skipped=0
+failed=0
 
-    # Sort and download versions
-    for major in $(seq $start_version $end_version); do
-        if [ -n "${CHROME_VERSIONS[$major]}" ]; then
-            total=$((total + 1))
-            if download_chrome "${CHROME_VERSIONS[$major]}"; then
-                success_count=$((success_count + 1))
-            else
-                fail_count=$((fail_count + 1))
-            fi
-            echo ""
-        fi
-    done
+for major in 130 144; do
+    version="${VERSIONS[$major]}"
 
-    print_info "Downloaded: ${success_count}/${total} (Failed: ${fail_count})"
-}
-
-# Function to download and install a Chrome channel (Beta/Dev/Canary)
-install_channel() {
-    local channel_name=$1
-    local install_dir="${CHROME_BASE_DIR}/${channel_name}"
-
-    print_info "Fetching latest ${channel_name} version..."
-
-    # Fetch channel version from API
-    local versions_json=$(curl -s "$CHANNEL_API_URL")
-
-    if [ -z "$versions_json" ]; then
-        print_error "Failed to fetch channel version information"
-        return 1
-    fi
-
-    # Extract version for the channel
-    local version=$(echo "$versions_json" | jq -r ".channels.${channel_name^}.version" 2>/dev/null)
-
-    if [ -z "$version" ] || [ "$version" = "null" ]; then
-        print_error "Could not find version for ${channel_name} channel"
-        return 1
-    fi
-
-    print_info "Latest ${channel_name} version: $version"
-
-    # Check if already installed
-    if [ -d "$install_dir" ] && [ -f "$install_dir/VERSION" ]; then
-        local installed_version=$(cat "$install_dir/VERSION")
-        if [ "$installed_version" = "$version" ]; then
-            print_warning "${channel_name} $version is already installed"
-            return 0
-        else
-            print_info "Upgrading from $installed_version to $version"
-            rm -rf "$install_dir"
-        fi
-    fi
-
-    # Create directory
-    mkdir -p "$install_dir"
-
-    # Download URL
-    local download_url="${CHROME_FOR_TESTING_URL}/${version}/linux64/chrome-linux64.zip"
-    local zip_file="/tmp/chrome-${channel_name}.zip"
-
-    print_info "Downloading ${channel_name} from: $download_url"
-
-    # Download with progress
-    if wget -q --show-progress "$download_url" -O "$zip_file" 2>&1; then
-        print_success "Download completed"
-    else
-        print_error "Failed to download ${channel_name} $version"
-        rm -f "$zip_file"
-        return 1
-    fi
-
-    # Extract
-    print_info "Extracting..."
-    if command -v unzip &> /dev/null; then
-        unzip -q "$zip_file" -d "$install_dir"
-    elif command -v python3 &> /dev/null; then
-        python3 -m zipfile -e "$zip_file" "$install_dir"
-    else
-        print_error "Neither unzip nor python3 found. Cannot extract."
-        rm -f "$zip_file"
-        return 1
-    fi
-    rm -f "$zip_file"
-
-    # Save version info
-    echo "$version" > "$install_dir/VERSION"
-
-    # Extract major version
-    local major_version=$(echo "$version" | cut -d'.' -f1)
-    echo "$major_version" > "$install_dir/MAJOR_VERSION"
-
-    # Save channel name
-    echo "$channel_name" > "$install_dir/CHANNEL"
-
-    # Verify installation
-    if [ -f "$install_dir/chrome-linux64/chrome" ]; then
-        chmod +x "$install_dir/chrome-linux64/chrome"
-        print_success "${channel_name} $version installed successfully"
-        print_info "Location: $install_dir/chrome-linux64/chrome"
-        return 0
-    else
-        print_error "Chrome binary not found after extraction"
-        return 1
-    fi
-}
-
-# Function to install all channels
-install_all_channels() {
-    print_info "Installing all Chrome channels (Beta, Dev, Canary)..."
-    echo ""
-
-    local success_count=0
-    local fail_count=0
-
-    for channel in beta dev canary; do
-        if install_channel "$channel"; then
-            success_count=$((success_count + 1))
-        else
-            fail_count=$((fail_count + 1))
-        fi
-        echo ""
-    done
-
-    print_info "Channels installed: ${success_count}/3 (Failed: ${fail_count})"
-}
-
-# Function to list installed versions
-list_versions() {
-    print_info "Installed Chrome versions:"
-    echo ""
-
-    if [ ! -d "$CHROME_BASE_DIR" ]; then
-        print_warning "No Chrome versions installed yet"
-        return
-    fi
-
-    local count=0
-    for dir in "$CHROME_BASE_DIR"/*; do
-        if [ -d "$dir" ] && [ -f "$dir/VERSION" ]; then
-            local version=$(cat "$dir/VERSION")
-            local major_version=$(cat "$dir/MAJOR_VERSION" 2>/dev/null || echo "?")
-            local dirname=$(basename "$dir")
-            local chrome_path="$dir/chrome-linux64/chrome"
-
-            if [ -f "$chrome_path" ]; then
-                echo -e "  ${GREEN}✓${NC} Chrome ${major_version} - v${version}"
-                echo -e "    ${CYAN}Path:${NC} $chrome_path"
-                count=$((count + 1))
+    if install_chrome "$major" "$version"; then
+        if [ -d "${CHROME_BASE_DIR}/${major}" ]; then
+            # 방금 설치되었는지, 이미 있었는지 구분
+            if [ $? -eq 0 ]; then
+                installed=$((installed + 1))
             fi
         fi
-    done
-
-    echo ""
-    if [ $count -eq 0 ]; then
-        print_warning "No Chrome versions found"
     else
-        print_info "Total: ${count} version(s) installed"
+        failed=$((failed + 1))
     fi
-}
-
-# Function to show usage
-show_usage() {
-    echo "Chrome Version Downloader"
-    echo "Supports Stable versions (127-144) and Channels (Beta/Dev/Canary)"
-    echo "Uses Chrome for Testing official repository"
     echo ""
-    echo "Usage: $0 [command] [options]"
+done
+
+echo "============================================================"
+echo "📊 설치 결과"
+echo "============================================================"
+echo ""
+
+# 현재 설치된 버전 확인
+echo -e "${GREEN}✅ 설치된 Chrome 버전:${NC}"
+for major in 130 144; do
+    version_dir="${CHROME_BASE_DIR}/${major}"
+    if [ -d "$version_dir" ] && [ -f "$version_dir/chrome-linux64/chrome" ]; then
+        version=$(cat "$version_dir/VERSION" 2>/dev/null || echo "unknown")
+        echo "  • Chrome ${major}: v${version}"
+    fi
+done
+
+echo ""
+
+if [ $failed -gt 0 ]; then
+    print_error "설치 실패: $failed 개"
+    exit 1
+else
+    print_success "모든 Chrome 버전 준비 완료!"
     echo ""
-    echo "Commands:"
-    echo "  all                Download all Stable versions (127-144)"
-    echo "  complete           Download all Stable versions + all Channels"
-    echo "  range START END    Download Stable versions in range (e.g., 127 142)"
-    echo "  version VER        Download specific version (e.g., 127.0.6533.119)"
-    echo "  beta               Download Chrome Beta channel"
-    echo "  dev                Download Chrome Dev channel"
-    echo "  canary             Download Chrome Canary channel"
-    echo "  channels           Download all channels (Beta, Dev, Canary)"
-    echo "  update             Fetch latest version information from API"
-    echo "  list               List all installed versions"
-    echo "  help               Show this help message"
+    echo "다음 명령어로 테스트하세요:"
+    echo "  python3 agent.py --version 130 --close"
+    echo "  python3 agent.py --version 144 --close"
     echo ""
-    echo "Examples:"
-    echo "  $0 all                      # Download all Stable 127-144"
-    echo "  $0 complete                 # Download all Stable + all Channels"
-    echo "  $0 range 127 142            # Download Stable 127-142"
-    echo "  $0 version 127.0.6533.119   # Download specific version"
-    echo "  $0 beta                     # Download Beta channel only"
-    echo "  $0 channels                 # Download all channels"
-    echo "  $0 update                   # Update version database"
-    echo "  $0 list                     # List installed versions"
-    echo ""
-}
-
-# Function to check dependencies
-check_dependencies() {
-    local missing_deps=()
-
-    if ! command -v wget &> /dev/null; then
-        missing_deps+=("wget")
-    fi
-
-    if ! command -v curl &> /dev/null; then
-        missing_deps+=("curl")
-    fi
-
-    if ! command -v jq &> /dev/null; then
-        missing_deps+=("jq")
-    fi
-
-    # Check for unzip or python3
-    if ! command -v unzip &> /dev/null && ! command -v python3 &> /dev/null; then
-        missing_deps+=("unzip or python3")
-    fi
-
-    if [ ${#missing_deps[@]} -gt 0 ]; then
-        print_error "Missing required dependencies: ${missing_deps[*]}"
-        print_info "Install with: sudo apt-get install ${missing_deps[*]}"
-        return 1
-    fi
-
-    return 0
-}
-
-# Main script logic
-main() {
-    # Check dependencies first
-    if ! check_dependencies; then
-        exit 1
-    fi
-
-    # Create base directory
-    mkdir -p "$CHROME_BASE_DIR"
-
-    case "${1:-help}" in
-        all)
-            fetch_latest_versions
-            download_range 127 144
-            echo ""
-            list_versions
-            ;;
-        complete)
-            print_info "Installing all Stable versions + all Channels..."
-            echo ""
-            fetch_latest_versions
-            download_range 127 144
-            echo ""
-            install_all_channels
-            echo ""
-            list_versions
-            ;;
-        range)
-            if [ -z "$2" ] || [ -z "$3" ]; then
-                print_error "Please specify start and end version numbers"
-                show_usage
-                exit 1
-            fi
-            fetch_latest_versions
-            download_range "$2" "$3"
-            echo ""
-            list_versions
-            ;;
-        version)
-            if [ -z "$2" ]; then
-                print_error "Please specify a version number"
-                show_usage
-                exit 1
-            fi
-            download_chrome "$2" "${3:-}"
-            ;;
-        beta)
-            install_channel "beta"
-            echo ""
-            list_versions
-            ;;
-        dev)
-            install_channel "dev"
-            echo ""
-            list_versions
-            ;;
-        canary)
-            install_channel "canary"
-            echo ""
-            list_versions
-            ;;
-        channels)
-            install_all_channels
-            echo ""
-            list_versions
-            ;;
-        update)
-            fetch_latest_versions
-            print_success "Version database updated"
-            echo ""
-            print_info "Available Stable versions:"
-            for major in $(seq 127 144); do
-                if [ -n "${CHROME_VERSIONS[$major]}" ]; then
-                    echo "  Chrome $major: ${CHROME_VERSIONS[$major]}"
-                fi
-            done
-            ;;
-        list)
-            list_versions
-            ;;
-        help|--help|-h)
-            show_usage
-            ;;
-        *)
-            print_error "Unknown command: $1"
-            show_usage
-            exit 1
-            ;;
-    esac
-}
-
-# Run main function
-main "$@"
+fi

@@ -145,16 +145,9 @@ fi
 log_step "5/8 Chrome 버전 설치 중..."
 echo ""
 
-log_info "권장 Chrome 버전 설치 중 (130, 144)..."
-
 if [ -x "$SCRIPT_DIR/install-chrome-versions.sh" ]; then
-    # 130 (구버전 TLS 대표)
-    "$SCRIPT_DIR/install-chrome-versions.sh" 130
-
-    # 144 (최신 버전)
-    "$SCRIPT_DIR/install-chrome-versions.sh" 144
-
-    log_success "Chrome 버전 설치 완료"
+    # Chrome 130, 144 자동 설치
+    "$SCRIPT_DIR/install-chrome-versions.sh"
 else
     log_error "install-chrome-versions.sh not found or not executable!"
     exit 1

@@ -76,9 +76,8 @@ python3 agent.py --version 134 --close
 # Python 패키지
 pip3 install --user -r requirements.txt
 
-# Chrome 버전
-./install-chrome-versions.sh 130
-./install-chrome-versions.sh 144
+# Chrome 130, 144 자동 설치
+./install-chrome-versions.sh
 
 # 권한 설정
 ./setup-permissions.sh
@@ -88,13 +87,15 @@ pip3 install --user -r requirements.txt
 
 ### Chrome 버전 관리
 ```bash
-# 권장 버전 설치
-./install-chrome-versions.sh 130  # 구버전 TLS (127-130 대표)
-./install-chrome-versions.sh 144  # 최신 버전 (131+ 대표)
-
-# 또는 특정 버전
-./install-chrome-versions.sh <version>
+# Chrome 130, 144 자동 설치 (기존 폴더 확인 후 없으면 설치)
+./install-chrome-versions.sh
 ```
+
+스크립트는 자동으로:
+- Chrome 130 (구버전 TLS, 127-130 대표)
+- Chrome 144 (최신 버전, 131+ 대표)
+
+두 버전의 설치 여부를 확인하고, 없으면 자동으로 다운로드 및 설치합니다.
 
 ### Agent 실행
 

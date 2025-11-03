@@ -55,43 +55,16 @@ python3 agent.py --version 134 --close
 
 #### 1. Chrome 버전 설치
 
-##### 권장 버전 (TLS 다양성)
 ```bash
-# 구버전 TLS (127-130 대표)
-./install-chrome-versions.sh 130
-
-# 최신 버전 (131+ 대표)
-./install-chrome-versions.sh 144
+# Chrome 130, 144 자동 설치
+./install-chrome-versions.sh
 ```
 
-##### Stable 버전 (127~144)
-```bash
-# 모든 Stable 버전 설치
-./install-chrome-versions.sh all
+스크립트는 자동으로 두 가지 Chrome 버전을 설치합니다:
+- **Chrome 130**: 구버전 TLS (127-130 대표)
+- **Chrome 144**: 최신 버전 (131+ 대표)
 
-# 특정 버전만 설치
-./install-chrome-versions.sh 134
-```
-
-##### Chrome 채널 (Beta/Dev/Canary)
-```bash
-# 모든 채널 설치 (Beta, Dev, Canary)
-./install-chrome-versions.sh channels
-
-# 개별 채널 설치
-./install-chrome-versions.sh beta
-./install-chrome-versions.sh dev
-./install-chrome-versions.sh canary
-
-# Stable + 채널 모두 설치
-./install-chrome-versions.sh complete
-```
-
-**채널 특징**:
-- **Beta**: 안정성 높음, 4주마다 새 메이저 버전
-- **Dev**: 최신 기능, 매주 업데이트
-- **Canary**: 최첨단 빌드, 매일 업데이트
-- **빌드 번호 다양성**: Stable 143과 Beta 143은 빌드 번호가 다름 (143.0.6948.x vs 143.0.7499.x)
+실행하면 기존 폴더를 확인하고 없는 버전만 자동으로 다운로드 및 설치합니다.
 
 #### 2. Python 패키지 설치
 

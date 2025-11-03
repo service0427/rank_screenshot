@@ -37,7 +37,7 @@ class WorkerStats:
             }
 
 
-def run_worker(worker_id: int, iterations: int, stats: WorkerStats):
+def run_worker(worker_id: int, iterations: int, stats: WorkerStats, edit_mode: str = None):
     """
     개별 워커 실행
 
@@ -45,6 +45,7 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats):
         worker_id: 워커 ID (1부터 시작)
         iterations: 반복 횟수
         stats: 통계 객체
+        edit_mode: Edit 모드 ("edit", "edit2", None)
     """
     print(f"[Worker-{worker_id}] 시작 - {iterations}회 반복 (instance_id={worker_id})")
 
@@ -55,16 +56,28 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats):
             print(f"\n[Worker-{worker_id}] 작업 {i}/{iterations} 시작")
             print("=" * 60)
 
-            # agent.py 실행 (각 워커에게 고유한 instance_id 할당)
+            # agent.py 실행 명령어 구성 (기본: --work-api --version random --close)
+            cmd = [
+                "python3", "agent.py",
+                "--work-api",
+                "--version", "random",
+            ]
+
+            # Edit 모드 옵션 추가 (선택 사항)
+            if edit_mode == "edit":
+                cmd.append("--edit")
+            elif edit_mode == "edit2":
+                cmd.append("--edit2")
+
+            # 나머지 옵션 추가
+            cmd.extend([
+                "--close",
+                "--instance", str(worker_id)  # 워커 ID를 instance_id로 사용
+            ])
+
+            # agent.py 실행
             result = subprocess.run(
-                [
-                    "python3", "agent.py",
-                    "--work-api",
-                    "--version", "random",
-                    "--edit2",  # Simple Swap 모드 (같은 페이지 내 순위 조작)
-                    "--close",
-                    "--instance", str(worker_id)  # 워커 ID를 instance_id로 사용
-                ],
+                cmd,
                 cwd=Path(__file__).parent,
                 capture_output=False,  # 출력을 콘솔에 표시
                 text=True
@@ -94,11 +107,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 사용 예시:
-  # 3개 스레드로 각각 10회 실행
+  # 3개 스레드로 각각 10회 실행 (기본: 순위 조작 없음)
   python3 run_workers.py --threads 3 --iterations 10
 
-  # 5개 스레드로 각각 20회 실행
-  python3 run_workers.py -t 5 -i 20
+  # Edit 모드로 5개 스레드 실행
+  python3 run_workers.py -t 5 -i 20 --edit
+
+  # Edit2 (Simple Swap) 모드로 실행
+  python3 run_workers.py -t 3 -i 10 --edit2
         """
     )
 
@@ -116,6 +132,18 @@ def main():
         help="각 스레드당 반복 횟수 (기본: 1)"
     )
 
+    parser.add_argument(
+        "--edit",
+        action="store_true",
+        help="Edit 모드 활성화 (DOM 재구성)"
+    )
+
+    parser.add_argument(
+        "--edit2",
+        action="store_true",
+        help="Edit2 모드 활성화 (Simple Swap)"
+    )
+
     args = parser.parse_args()
 
     # 입력 검증
@@ -127,6 +155,16 @@ def main():
         print("❌ 반복 횟수는 1 이상이어야 합니다")
         return
 
+    # Edit 모드 결정
+    edit_mode = None
+    if args.edit and args.edit2:
+        print("❌ --edit와 --edit2는 동시에 사용할 수 없습니다")
+        return
+    elif args.edit:
+        edit_mode = "edit"
+    elif args.edit2:
+        edit_mode = "edit2"
+
     # 시작 정보 출력
     print("\n" + "=" * 60)
     print("🚀 멀티 워커 실행")
@@ -134,6 +172,8 @@ def main():
     print(f"스레드 개수: {args.threads}")
     print(f"반복 횟수: {args.iterations} (스레드당)")
     print(f"총 작업 수: {args.threads * args.iterations}")
+    if edit_mode:
+        print(f"Edit 모드: {edit_mode}")
     print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60 + "\n")
 
@@ -147,7 +187,7 @@ def main():
     for worker_id in range(1, args.threads + 1):
         thread = threading.Thread(
             target=run_worker,
-            args=(worker_id, args.iterations, stats),
+            args=(worker_id, args.iterations, stats, edit_mode),
             name=f"Worker-{worker_id}"
         )
         threads.append(thread)

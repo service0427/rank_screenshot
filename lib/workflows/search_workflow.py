@@ -108,7 +108,8 @@ class SearchWorkflow:
         item_id: Optional[str] = None,
         vendor_item_id: Optional[str] = None,
         version: str = "unknown",
-        min_rank: Optional[int] = None
+        min_rank: Optional[int] = None,
+        work_id: Optional[int] = None
     ) -> SearchWorkflowResult:
         """
         전체 워크플로우 실행
@@ -125,6 +126,7 @@ class SearchWorkflow:
             SearchWorkflowResult 객체
         """
         result = SearchWorkflowResult()
+        self.work_id = work_id  # 메타데이터 생성 시 사용
 
         try:
             # 0. 상품 페이지 방문 (--edit 옵션이 있고, product_id/item_id/vendor_item_id가 있는 경우만)
@@ -1162,6 +1164,7 @@ class SearchWorkflow:
         """업로드용 메타데이터 생성"""
         url_params = self.finder.extract_url_params(product_info.get('link', ''))
         return {
+            'screenshot_id': self.work_id if hasattr(self, 'work_id') and self.work_id else '',
             'keyword': keyword,
             'product_id': url_params['product_id'],
             'item_id': url_params['item_id'],

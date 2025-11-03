@@ -102,6 +102,7 @@ class ScreenshotUploader:
 
                     # 메타데이터를 form data로 추가 (필수 필드만)
                     data = {
+                        'screenshot_id': metadata.get('screenshot_id', ''),
                         'keyword': metadata.get('keyword', ''),
                         'product_id': metadata.get('product_id', ''),
                         'item_id': metadata.get('item_id', ''),

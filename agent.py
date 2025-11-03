@@ -245,7 +245,8 @@ def run_agent_selenium_uc(
             item_id=item_id,
             vendor_item_id=vendor_item_id,
             version=version if version else "unknown",
-            min_rank=min_rank  # 최소 순위 전달
+            min_rank=min_rank,  # 최소 순위 전달
+            work_id=work_id  # 작업 ID 전달 (업로드 시 screenshot_id로 사용)
         )
 
         # === 6. 결과 출력 ===

@@ -60,15 +60,14 @@ log_info "Setting browser-profiles directory permissions..."
 
 PROFILES_DIR="$SCRIPT_DIR/browser-profiles"
 if [ -d "$PROFILES_DIR" ]; then
-    # 상위 디렉토리만 755 (VPN 사용자들이 접근만 가능하면 됨)
-    # 각 VPN은 자신의 프로필 디렉토리(vpnN-chrome-XXX/)를 생성하므로
-    # 개별 프로필은 권한 설정 불필요 (각자 소유)
-    chmod 755 "$PROFILES_DIR" 2>/dev/null || log_warn "Could not set permissions on $PROFILES_DIR"
-    log_success "Browser profiles directory accessible (755)"
+    # 777 권한 (VPN 사용자들이 하위 디렉토리 생성 가능)
+    # 각 VPN은 자신의 프로필 디렉토리(vpnN-chrome-XXX/)를 생성
+    chmod 777 "$PROFILES_DIR" 2>/dev/null || log_warn "Could not set permissions on $PROFILES_DIR"
+    log_success "Browser profiles directory writable (777)"
 else
     mkdir -p "$PROFILES_DIR"
-    chmod 755 "$PROFILES_DIR"
-    log_success "Browser profiles directory created (755)"
+    chmod 777 "$PROFILES_DIR"
+    log_success "Browser profiles directory created (777)"
 fi
 
 # ===================================================================

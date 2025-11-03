@@ -819,8 +819,6 @@ Examples:
                 return
 
             print(f"🔄 Restarting with VPN {args.vpn} (wg{args.vpn}/vpn{args.vpn})...\n")
-            env = os.environ.copy()
-            env['VPN_EXECUTED'] = str(args.vpn)
 
             new_args = []
             skip_next = False
@@ -835,8 +833,9 @@ Examples:
                     continue
                 new_args.append(arg)
 
-            cmd = [vpn_cmd, str(args.vpn), 'python3'] + new_args
-            os.execvpe(vpn_cmd, cmd, env)
+            # VPN_EXECUTED 환경 변수를 명시적으로 전달 (sudo -u 전환 시에도 유지)
+            cmd = [vpn_cmd, str(args.vpn), 'env', f'VPN_EXECUTED={args.vpn}', 'python3'] + new_args
+            os.execvpe(vpn_cmd, cmd, os.environ.copy())
             return
     # === 작업 API 모드 ===
     if args.work_api or ENABLE_WORK_API:

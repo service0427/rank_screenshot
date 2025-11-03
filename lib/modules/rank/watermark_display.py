@@ -106,7 +106,7 @@ class WatermarkDisplay:
                 // 쿠팡 스타일과 동일하게 설정
                 mark.style.position = 'absolute';
                 mark.style.top = '10px';
-                mark.style.left = '10px';
+                mark.style.right = '10px';  // 오른쪽 상단으로 변경
                 mark.style.backgroundColor = '#FF6B00';  // 쿠팡 오렌지색
                 mark.style.color = 'white';
                 mark.style.padding = '4px 8px';

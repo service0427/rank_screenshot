@@ -114,7 +114,7 @@ class WatermarkManager:
                         mark.textContent = rank;
                         mark.style.position = 'absolute';
                         mark.style.top = '10px';
-                        mark.style.left = '10px';
+                        mark.style.right = '10px';  // 오른쪽 상단으로 변경
                         mark.style.backgroundColor = '#FF6B00';
                         mark.style.color = 'white';
                         mark.style.padding = '4px 8px';

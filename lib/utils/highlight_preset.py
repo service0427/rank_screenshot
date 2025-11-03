@@ -6,6 +6,7 @@
 
 from typing import Dict, Any
 from dataclasses import dataclass
+from lib.constants import Config
 
 
 @dataclass
@@ -24,42 +25,24 @@ class HighlightStyle:
 
     # P/I/V 라벨 표시 설정
     show_piv_labels: bool = True
-    label_position: str = "top-right"  # 순위 배지와 위치 교환
-    label_font_size: int = 15  # 크기 증가
-    label_background: str = "rgba(0, 0, 0, 0.85)"  # 더 진한 배경
-    label_text_color: str = "#CCCCCC"  # 기본 텍스트는 회색
-    label_padding: int = 10  # 패딩 증가
+    label_font_size: int = 15
+    label_background: str = "rgba(0, 0, 0, 0.85)"
+    label_text_color: str = "#CCCCCC"
+    label_padding: int = 10
     label_border_radius: int = 4
 
     # 매칭 강조 색상
-    match_highlight_color: str = "#FFFF00"  # 노란색으로 강조 (더 눈에 띄게)
+    match_highlight_color: str = "#FFFF00"
 
     # 순위 배지 설정
     show_rank_badge: bool = True
-    rank_badge_position: str = "top-left"  # P/I/V 라벨과 위치 교환
-    rank_badge_size: int = 45  # 크기 증가
+    rank_badge_size: int = 45
     rank_badge_color: str = "#FF6B6B"
     rank_badge_text_color: str = "#FFFFFF"
 
 
-class HighlightPresets:
-    """사전 정의된 하이라이트 프리셋"""
-
-    @staticmethod
-    def default() -> HighlightStyle:
-        """기본 스타일 (빨강 테두리 + P/I/V 라벨 + 순위 배지)"""
-        return HighlightStyle()
-
-    @staticmethod
-    def get_preset(name: str) -> HighlightStyle:
-        """프리셋 이름으로 스타일 가져오기"""
-        # 현재는 default만 지원, 추후 필요시 추가
-        return HighlightPresets.default()
-
-    @staticmethod
-    def list_presets() -> list:
-        """사용 가능한 프리셋 목록"""
-        return ["default"]
+# HighlightPresets 클래스 제거됨
+# 이제 Config 값을 직접 사용하여 HighlightStyle 생성
 
 
 def generate_highlight_js(
@@ -99,14 +82,14 @@ def generate_highlight_js(
     # P/I/V 라벨 HTML 생성
     piv_html = ""
     if style.show_piv_labels:
-        # 위치 계산
-        position_styles = {
-            "top-left": "top: 10px; left: 10px;",
-            "top-right": "top: 10px; right: 10px;",
-            "bottom-left": "bottom: 10px; left: 10px;",
-            "bottom-right": "bottom: 10px; right: 10px;"
-        }
-        position_style = position_styles.get(style.label_position, position_styles["top-left"])
+        # Config 값으로 위치 직접 설정
+        from lib.constants import Config
+        pos_parts = []
+        if Config.HIGHLIGHT_LABEL_TOP: pos_parts.append(f"top: {Config.HIGHLIGHT_LABEL_TOP};")
+        if Config.HIGHLIGHT_LABEL_RIGHT: pos_parts.append(f"right: {Config.HIGHLIGHT_LABEL_RIGHT};")
+        if Config.HIGHLIGHT_LABEL_BOTTOM: pos_parts.append(f"bottom: {Config.HIGHLIGHT_LABEL_BOTTOM};")
+        if Config.HIGHLIGHT_LABEL_LEFT: pos_parts.append(f"left: {Config.HIGHLIGHT_LABEL_LEFT};")
+        position_style = " ".join(pos_parts)
 
         # 각 항목의 색상 결정 (매칭된 항목은 강조)
         def get_color(field_name):
@@ -117,7 +100,7 @@ def generate_highlight_js(
         vendor_color = get_color("vendor")
 
         piv_html = f"""
-        <div style="
+        <div class="piv-label" style="
             position: absolute;
             {position_style}
             background: {style.label_background};
@@ -131,32 +114,33 @@ def generate_highlight_js(
             pointer-events: none;
             box-shadow: 0 2px 8px rgba(0,0,0,0.3);
         ">
-            <div style="color: {product_color}; font-weight: {'bold' if 'product' in matched_fields else 'normal'};">
+            <div class="piv-product" style="color: {product_color}; font-weight: {'bold' if 'product' in matched_fields else 'normal'};">
                 P: {product_data.get('product_id', 'N/A')}
             </div>
-            <div style="color: {item_color}; font-weight: {'bold' if 'item' in matched_fields else 'normal'};">
+            <div class="piv-item" style="color: {item_color}; font-weight: {'bold' if 'item' in matched_fields else 'normal'};">
                 I: {product_data.get('item_id', 'N/A')}
             </div>
-            <div style="color: {vendor_color}; font-weight: {'bold' if 'vendor' in matched_fields else 'normal'};">
+            <div class="piv-vendor" style="color: {vendor_color}; font-weight: {'bold' if 'vendor' in matched_fields else 'normal'};">
                 V: {product_data.get('vendor_item_id', 'N/A')}
             </div>
         </div>
         """
 
     # 순위 배지 HTML 생성 (11등 이상만 표시)
+    from lib.constants import Config
     rank_badge_html = ""
     rank = product_data.get('rank')
-    if style.show_rank_badge and rank and rank >= 11:
-        position_styles = {
-            "top-left": "top: 10px; left: 10px;",
-            "top-right": "top: 10px; right: 10px;",
-            "bottom-left": "bottom: 10px; left: 10px;",
-            "bottom-right": "bottom: 10px; right: 10px;"
-        }
-        badge_position = position_styles.get(style.rank_badge_position, position_styles["top-right"])
+    if style.show_rank_badge and rank and rank >= Config.HIGHLIGHT_RANK_BADGE_MIN_RANK:
+        # Config 값으로 위치 직접 설정
+        pos_parts = []
+        if Config.HIGHLIGHT_RANK_BADGE_TOP: pos_parts.append(f"top: {Config.HIGHLIGHT_RANK_BADGE_TOP};")
+        if Config.HIGHLIGHT_RANK_BADGE_RIGHT: pos_parts.append(f"right: {Config.HIGHLIGHT_RANK_BADGE_RIGHT};")
+        if Config.HIGHLIGHT_RANK_BADGE_BOTTOM: pos_parts.append(f"bottom: {Config.HIGHLIGHT_RANK_BADGE_BOTTOM};")
+        if Config.HIGHLIGHT_RANK_BADGE_LEFT: pos_parts.append(f"left: {Config.HIGHLIGHT_RANK_BADGE_LEFT};")
+        badge_position = " ".join(pos_parts)
 
         rank_badge_html = f"""
-        <div style="
+        <div class="rank-badge" style="
             position: absolute;
             {badge_position}
             width: {style.rank_badge_size}px;

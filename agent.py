@@ -107,6 +107,7 @@ def run_agent_selenium_uc(
     version: str = None,
     test_detection: bool = False,
     close_after: bool = False,
+    fresh_profile: bool = False,
     screenshot_id: int = None,
     api_client: WorkAPIClient = None,
     check_ip: bool = False,
@@ -114,10 +115,9 @@ def run_agent_selenium_uc(
     window_height: int = 1200,
     window_x: int = 10,
     window_y: int = 10,
-    enable_rank_edit: bool = False,
-    edit_mode: str = None,
-    min_rank: int = None,
-    highlight_preset: str = "default",
+    enable_rank_adjust: bool = False,  # Adjust 모드 (미래 개발용)
+    adjust_mode: str = None,  # "adjust" 또는 "adjust2" (미래 개발용)
+    min_rank: int = None,  # Adjust 모드용 최소 순위 (미래 개발용)
     enable_main_filter: bool = False
 ):
     """
@@ -164,6 +164,7 @@ def run_agent_selenium_uc(
         driver = core.launch(
             version=version,
             use_profile=True,
+            fresh_profile=fresh_profile,
             headless=False,
             window_width=window_width,
             window_height=window_height,
@@ -233,9 +234,6 @@ def run_agent_selenium_uc(
             finder=finder,
             screenshot_processor=screenshot_processor,
             core=core,  # 네트워크 필터 제어를 위해 core 객체 전달
-            enable_rank_manipulation=enable_rank_edit,  # 파라미터로 전달받은 값 사용
-            edit_mode=edit_mode,  # 순위 조작 모드 ("edit" 또는 "edit2")
-            highlight_preset=highlight_preset,
             enable_main_filter=enable_main_filter  # 메인 페이지 필터 활성화 여부
         )
 
@@ -245,7 +243,7 @@ def run_agent_selenium_uc(
             item_id=item_id,
             vendor_item_id=vendor_item_id,
             version=version if version else "unknown",
-            min_rank=min_rank,  # 최소 순위 전달
+            min_rank=min_rank,  # Adjust 모드 개발용 인터페이스 (현재 미사용)
             screenshot_id=screenshot_id  # 작업 ID 전달 (업로드 시 screenshot_id로 사용)
         )
 
@@ -303,7 +301,7 @@ def run_agent_selenium_uc(
 
                 # 성공 시: 스크린샷 URL 선택, 실패 시: "PRODUCT_NOT_FOUND"
                 if result.success:
-                    # Edit 모드에서 after 스크린샷이 있으면 after 사용, 아니면 before 사용
+                    # Adjust 모드에서 after 스크린샷이 있으면 after 사용, 아니면 before 사용
                     if result.after_screenshot_url:
                         screenshot_url = result.after_screenshot_url
                         print(f"📤 스크린샷 URL: {screenshot_url}")
@@ -398,14 +396,14 @@ def run_work_api_mode(
     instance_id: int = 1,
     version: str = None,
     close_after: bool = True,
+    fresh_profile: bool = False,
     check_ip: bool = False,
     window_width: int = 1300,
     window_height: int = 1200,
     window_x: int = 10,
     window_y: int = 10,
-    highlight_preset: str = "default",
-    enable_rank_edit: bool = False,
-    edit_mode: str = None,
+    enable_rank_adjust: bool = False,
+    adjust_mode: str = None,
     enable_main_filter: bool = False,
     specified_screenshot_id: int = None
 ):
@@ -423,8 +421,7 @@ def run_work_api_mode(
         window_height: 창 높이 (기본: 1200)
         window_x: 창 X 위치 (기본: 10)
         window_y: 창 Y 위치 (기본: 10)
-        highlight_preset: 하이라이트 프리셋
-        enable_rank_edit: 순위 조작 활성화 여부 (기본: False)
+        enable_rank_adjust: 순위 조작 활성화 여부 (기본: False)
         enable_main_filter: 메인 페이지 네트워크 필터 활성화 여부 (기본: False)
         specified_screenshot_id: 지정된 작업 ID (None이면 자동 할당)
     """
@@ -476,6 +473,7 @@ def run_work_api_mode(
         version=version,
         test_detection=False,
         close_after=close_after,
+        fresh_profile=fresh_profile,
         screenshot_id=screenshot_id,
         api_client=api_client,
         check_ip=check_ip,
@@ -483,9 +481,8 @@ def run_work_api_mode(
         window_height=window_height,
         window_x=calc_x,
         window_y=calc_y,
-        highlight_preset=highlight_preset,
-        enable_rank_edit=enable_rank_edit,
-        edit_mode=edit_mode,
+        enable_rank_adjust=enable_rank_adjust,
+        adjust_mode=adjust_mode,
         min_rank=min_rank,
         enable_main_filter=enable_main_filter
     )
@@ -572,153 +569,212 @@ def select_chrome_version() -> str:
 def main():
     """메인 진입점"""
     parser = argparse.ArgumentParser(
-        description="Coupang Agent V2 - Selenium + undetected-chromedriver (Chrome only)"
+        description="Coupang Agent V2 - Selenium + undetected-chromedriver (Chrome only)",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # 인터랙티브 모드 (버전 선택)
+  python3 agent.py
+
+  # 특정 버전 지정
+  python3 agent.py --version 134 --keyword "노트북"
+
+  # VPN 사용
+  python3 agent.py --version 134 --vpn 0
+
+  # 작업 API 모드 (서버에서 작업 받기)
+  python3 agent.py --work-api
+
+  # 디버그 모드
+  python3 agent.py --debug --keyword "키보드"
+        """
     )
 
-    parser.add_argument(
-        "--instance",
-        type=int,
-        default=1,
-        help="Instance ID (default: 1)"
-    )
+    # ===================================================================
+    # 🎯 핵심 옵션
+    # ===================================================================
+    core_group = parser.add_argument_group('🎯 Core Options', '핵심 실행 옵션')
 
-    parser.add_argument(
-        "--keyword",
-        type=str,
-        default="노트북",
-        help="Search keyword (default: 노트북)"
-    )
-
-    parser.add_argument(
-        "--product_id",
-        type=str,
-        default=TARGET_PRODUCT['product_id'],
-        help=f"Product ID for matching (default: {TARGET_PRODUCT['product_id']})"
-    )
-
-    parser.add_argument(
-        "--item_id",
-        type=str,
-        default=TARGET_PRODUCT['item_id'],
-        help=f"Item ID for matching (default: {TARGET_PRODUCT['item_id']})"
-    )
-
-    parser.add_argument(
-        "--vendor_item_id",
-        type=str,
-        default=TARGET_PRODUCT['vendor_item_id'],
-        help=f"Vendor Item ID for matching (default: {TARGET_PRODUCT['vendor_item_id']})"
-    )
-
-    parser.add_argument(
+    core_group.add_argument(
         "--version",
         type=str,
         default=None,
+        metavar="VER",
         help="Chrome version (127-144, beta, dev, canary, or 'random')"
     )
 
-    parser.add_argument(
-        "--test-detection",
-        action="store_true",
-        help="Run detection test first"
+    core_group.add_argument(
+        "--keyword",
+        type=str,
+        default="노트북",
+        metavar="TEXT",
+        help="Search keyword (default: 노트북)"
     )
 
-    parser.add_argument(
-        "--interactive",
-        action="store_true",
-        help="Interactive mode - select version manually"
-    )
-
-    parser.add_argument(
-        "--close",
-        action="store_true",
-        help="Close browser automatically after 3 seconds"
-    )
-
-    parser.add_argument(
+    core_group.add_argument(
         "--vpn",
         type=int,
         default=None,
+        metavar="N",
         help="VPN server number (0=wg0/vpn0, 1=wg1/vpn1, etc.)"
     )
 
-    parser.add_argument(
+    core_group.add_argument(
         "--work-api",
-        nargs="?",  # 옵션 값이 있을 수도, 없을 수도 있음
-        const=True,  # 값 없이 --work-api만 쓰면 True
+        nargs="?",
+        const=True,
         default=False,
-        help="Work API mode - fetch work from allocation API. Use --work-api=123 to specify work ID"
+        metavar="ID",
+        help="Work API mode - fetch tasks from server. Optional: specify work ID"
     )
 
-    parser.add_argument(
-        "--ip-check",
-        action="store_true",
-        help="Check IP address before running (uses api.ipify.org)"
+    # ===================================================================
+    # 🎨 상품 매칭 설정
+    # ===================================================================
+    product_group = parser.add_argument_group('🎨 Product Matching', '타겟 상품 설정')
+
+    product_group.add_argument(
+        "--product_id",
+        type=str,
+        default=TARGET_PRODUCT['product_id'],
+        metavar="ID",
+        help=f"Product ID (default: {TARGET_PRODUCT['product_id']})"
     )
 
-    # 창 크기 및 위치 설정
-    parser.add_argument(
+    product_group.add_argument(
+        "--item_id",
+        type=str,
+        default=TARGET_PRODUCT['item_id'],
+        metavar="ID",
+        help=f"Item ID (default: {TARGET_PRODUCT['item_id']})"
+    )
+
+    product_group.add_argument(
+        "--vendor_item_id",
+        type=str,
+        default=TARGET_PRODUCT['vendor_item_id'],
+        metavar="ID",
+        help=f"Vendor Item ID (default: {TARGET_PRODUCT['vendor_item_id']})"
+    )
+
+    # ===================================================================
+    # 🪟 브라우저 설정
+    # ===================================================================
+    browser_group = parser.add_argument_group('🪟 Browser Settings', '브라우저 창 설정')
+
+    browser_group.add_argument(
         "-W", "--width",
         type=int,
         default=1300,
         dest="window_width",
-        help="Browser window width (default: 1300)"
+        metavar="PX",
+        help="Window width in pixels (default: 1300)"
     )
 
-    parser.add_argument(
+    browser_group.add_argument(
         "-H", "--height",
         type=int,
         default=1200,
         dest="window_height",
-        help="Browser window height (default: 1200)"
+        metavar="PX",
+        help="Window height in pixels (default: 1200)"
     )
 
-    parser.add_argument(
+    browser_group.add_argument(
         "-X", "--x-pos",
         type=int,
         default=10,
         dest="window_x",
-        help="Browser window X position (default: 10)"
+        metavar="PX",
+        help="Window X position (default: 10)"
     )
 
-    parser.add_argument(
+    browser_group.add_argument(
         "-Y", "--y-pos",
         type=int,
         default=10,
         dest="window_y",
-        help="Browser window Y position (default: 10)"
+        metavar="PX",
+        help="Window Y position (default: 10)"
     )
 
-    parser.add_argument(
-        "--highlight",
-        type=str,
-        default="default",
-        choices=["default"],
-        help="Highlight preset for matched product (default: default)"
+    browser_group.add_argument(
+        "--close",
+        action="store_true",
+        help="Auto-close browser after 3 seconds"
     )
 
-    parser.add_argument(
-        "--edit",
+    browser_group.add_argument(
+        "--fresh-profile",
         action="store_true",
         default=False,
-        help="Enable rank manipulation (순위 조작 활성화 - 복잡한 DOM 재구성, 기본: False)"
+        help="Delete old profile and start fresh (기본: 프로필 유지 + 쿠키/세션만 삭제)"
     )
 
-    parser.add_argument(
-        "--edit2",
-        action="store_true",
-        default=False,
-        help="Enable rank manipulation v2 (순위 조작 활성화 - Simple Swap, 기본: False)"
+    # ===================================================================
+    # 🔧 고급 옵션
+    # ===================================================================
+    advanced_group = parser.add_argument_group('🔧 Advanced Options', '고급 설정')
+
+    advanced_group.add_argument(
+        "--instance",
+        type=int,
+        default=1,
+        metavar="N",
+        help="Instance ID for multi-instance setup (default: 1)"
     )
 
-    parser.add_argument(
+    advanced_group.add_argument(
         "--enable-main-filter",
         action="store_true",
         default=False,
-        help="Enable network filter on Coupang main page (메인 페이지 광고/트래킹 차단, 기본: False)"
+        help="Enable network filter on main page (차단: 광고/트래킹)"
+    )
+
+    advanced_group.add_argument(
+        "--adjust",
+        action="store_true",
+        default=False,
+        help="[개발중] Enable rank adjustment (순위 조정 - 미구현)"
+    )
+
+    # ===================================================================
+    # 🐛 디버그 & 테스트
+    # ===================================================================
+    debug_group = parser.add_argument_group('🐛 Debug & Testing', '디버깅 및 테스트')
+
+    debug_group.add_argument(
+        "--debug",
+        action="store_true",
+        default=False,
+        help="Enable debug mode (상세 로그 + 파일 저장)"
+    )
+
+    debug_group.add_argument(
+        "--test-detection",
+        action="store_true",
+        help="Run bot detection test before main task"
+    )
+
+    debug_group.add_argument(
+        "--ip-check",
+        action="store_true",
+        help="Display current IP address (uses api.ipify.org)"
+    )
+
+    debug_group.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Interactive mode - manually select options"
     )
 
     args = parser.parse_args()
+
+    # === 디버그 모드 설정 ===
+    from lib.constants import Config
+    Config.DEBUG_MODE = args.debug
+    if args.debug:
+        print("🐛 디버그 모드 활성화")
 
     # === 버전 선택 (최우선 처리) ===
     # --version random 처리
@@ -786,14 +842,14 @@ def main():
             instance_id=args.instance,
             version=args.version,
             close_after=args.close,
+            fresh_profile=args.fresh_profile,
             check_ip=args.ip_check,
             window_width=args.window_width,
             window_height=args.window_height,
             window_x=args.window_x,
             window_y=args.window_y,
-            highlight_preset=args.highlight,
-            enable_rank_edit=args.edit or args.edit2,
-            edit_mode="edit2" if args.edit2 else ("edit" if args.edit else None),
+            enable_rank_adjust=args.adjust,
+            adjust_mode="adjust" if args.adjust else None,
             enable_main_filter=args.enable_main_filter,
             specified_screenshot_id=specified_screenshot_id
         )
@@ -825,14 +881,14 @@ def main():
         version=args.version,
         test_detection=args.test_detection,
         close_after=args.close,
+        fresh_profile=args.fresh_profile,
         check_ip=args.ip_check,
         window_width=args.window_width,
         window_height=args.window_height,
         window_x=args.window_x,
         window_y=args.window_y,
-        highlight_preset=args.highlight,
-        enable_rank_edit=args.edit or args.edit2,
-        edit_mode="edit2" if args.edit2 else ("edit" if args.edit else None),
+        enable_rank_adjust=args.adjust,
+        adjust_mode="adjust" if args.adjust else None,
         enable_main_filter=args.enable_main_filter
     )
 

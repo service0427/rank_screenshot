@@ -7,6 +7,7 @@
 from typing import Optional, Tuple
 import time
 import random
+import re
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
@@ -27,7 +28,7 @@ class PaginationHandler:
 
     def go_to_page(self, page_num: int, wait_time: float = 2.0) -> Tuple[bool, Optional[str]]:
         """
-        특정 페이지로 이동 (클릭 기반)
+        특정 페이지로 이동 (URL 파라미터 기반 우선, 실패 시 클릭 기반)
 
         Args:
             page_num: 이동할 페이지 번호 (1-based)
@@ -43,6 +44,15 @@ class PaginationHandler:
             if self.current_page == page_num:
                 print(f"   ℹ️  이미 페이지 {page_num}에 있습니다")
                 return (True, None)
+
+            # 방법 1: URL 파라미터로 직접 이동 (가장 안정적)
+            print(f"   🔗 URL 파라미터로 페이지 {page_num} 이동 시도...")
+            url_success = self._go_to_page_by_url(page_num, wait_time)
+            if url_success:
+                return (True, None)
+
+            # 방법 2: 클릭 기반 이동 (폴백)
+            print(f"   🖱️  클릭 기반 페이지 {page_num} 이동 시도...")
 
             # 1. 페이지네이션 영역 찾기
             pagination = self._find_pagination_area()
@@ -165,6 +175,15 @@ class PaginationHandler:
             # 모든 페이지 링크 가져오기
             page_links = pagination.find_elements(By.TAG_NAME, 'a')
 
+            # 디버깅: 발견된 모든 링크 출력
+            print(f"   🔍 페이지네이션 디버그: {len(page_links)}개 링크 발견")
+            for idx, link in enumerate(page_links):
+                text = link.text.strip()
+                href = link.get_attribute('href') or ''
+                class_name = link.get_attribute('class') or ''
+                data_page = link.get_attribute('data-page') or ''
+                print(f"      [{idx}] text='{text}', data-page='{data_page}', class='{class_name[:50]}...'")
+
             for link in page_links:
                 # 링크 텍스트가 페이지 번호와 일치하는지 확인
                 text = link.text.strip()
@@ -285,6 +304,53 @@ class PaginationHandler:
 
         except Exception as e:
             print(f"   ⚠️  이전 그룹 이동 실패: {e}")
+            return False
+
+    def _go_to_page_by_url(self, page_num: int, wait_time: float = 2.0) -> bool:
+        """
+        URL 파라미터를 변경하여 페이지 이동
+
+        Args:
+            page_num: 이동할 페이지 번호
+            wait_time: 페이지 로드 후 대기 시간
+
+        Returns:
+            성공 여부
+        """
+        try:
+            current_url = self.driver.current_url
+
+            # URL에 page 파라미터 추가/변경
+            if '&page=' in current_url:
+                # 기존 page 파라미터 교체
+                new_url = re.sub(r'&page=\d+', f'&page={page_num}', current_url)
+            elif '?page=' in current_url:
+                # 첫 파라미터가 page인 경우
+                new_url = re.sub(r'\?page=\d+', f'?page={page_num}', current_url)
+            else:
+                # page 파라미터가 없으면 추가
+                separator = '&' if '?' in current_url else '?'
+                new_url = f"{current_url}{separator}page={page_num}"
+
+            # 새 URL로 이동
+            self.driver.get(new_url)
+
+            # 페이지 로드 대기
+            time.sleep(wait_time)
+
+            # 현재 페이지 번호 업데이트
+            actual_page = self._get_current_page_from_url()
+            if actual_page:
+                self.current_page = actual_page
+                print(f"   ✅ URL 파라미터로 페이지 {actual_page}로 이동 완료")
+                return True
+            else:
+                self.current_page = page_num
+                print(f"   ✅ URL 파라미터로 페이지 {page_num}로 이동 완료")
+                return True
+
+        except Exception as e:
+            print(f"   ⚠️  URL 기반 페이지 이동 실패: {e}")
             return False
 
     def _get_current_page_from_url(self) -> Optional[int]:

@@ -67,6 +67,13 @@ class ScreenshotCapturer:
             print(f"   Path: {filepath}")
             print(f"   Size: {file_size:.2f} KB")
 
+            # 오래된 스크린샷 자동 정리 (최신 50개만 유지)
+            from lib.utils.file_cleanup import cleanup_screenshots
+            try:
+                cleanup_screenshots(base_dir=self.base_dir, keep_count=50)
+            except Exception:
+                pass  # 정리 실패해도 스크린샷 캡처는 성공으로 처리
+
             return str(filepath)
 
         except Exception as e:

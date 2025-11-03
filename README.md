@@ -337,3 +337,65 @@ Status: {'execution_status': 'RESULTS_LOADED', 'action_status': 'SUCCESS', ...}
 ## 📝 라이센스
 
 MIT License
+
+---
+
+## 🎯 순수 오리지널 워크플로우 (2025-11-03 업데이트)
+
+**Edit 모드 완전 제거 완료**
+
+### 워크플로우
+
+```
+Main → Search → Match → Highlight → Watermark → Capture → Upload
+```
+
+### 핵심 변경사항
+
+1. **코드 크기 감소**: 1,485 라인 → 748 라인 (50% 감소)
+2. **Edit 모드 제거**: 순위 조작, 페이지 이동, DOM 교체 기능 삭제
+3. **워터마크 단순화**: 
+   - 쿠팡 원본 (1~10위) 유지
+   - 커스텀 워터마크 (11위 이상) 추가
+   - 타겟 상품 구분 제거
+
+### 주요 모듈
+
+| 모듈 | 책임 | 위치 |
+|------|------|------|
+| `search_workflow.py` | 워크플로우 관리 | `lib/workflows/` |
+| `product_finder.py` | 상품 검색 및 매칭 | `lib/modules/` |
+| `watermark_display.py` | 워터마크 표시 | `lib/modules/rank/` |
+| `screenshot_processor.py` | 캡처 및 업로드 | `lib/utils/` |
+
+### 중요 버그 수정 (2025-11-03)
+
+**Dictionary 병합 순서 버그** - `product_finder.py:169-175`
+
+- **문제**: `**url_params`의 위치에 따라 rank 값이 잘못 저장됨
+- **증상**: debug-overlay 순위가 1,2,3,6,7,8... (4,5 건너뛰어짐)
+- **해결**: 올바른 순서로 변경 (`**url_params` 먼저, `"rank": organic_rank` 나중)
+- **상세**: 코드에 주석으로 상세 설명 추가
+
+### 디버깅
+
+**디버그 파일 생성**:
+```bash
+# 디버그 파일 위치
+/home/tech/agent/debug_logs/debug_overlay_*.json
+```
+
+**활성화**: `Config.ENABLE_DEBUG_OVERLAY = True` (기본값)
+
+**용도**: 콘솔 로그만으로 발견할 수 없는 버그 추적
+
+---
+
+## 📖 문서
+
+- **CLAUDE.md**: Claude Code 작업 가이드 및 관리 원칙
+- **README.md**: 프로젝트 개요 및 빠른 시작 (이 문서)
+
+**중요**: 함수/변수 용도는 코드에 직접 주석으로 작성되어 있습니다.
+
+---

@@ -11,6 +11,8 @@ from urllib.parse import urlparse, parse_qs
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
 
+from lib.constants import Config
+
 
 class ProductFinder:
     """쿠팡 검색 결과에서 특정 순위의 상품을 찾고 화면 중앙에 위치시키는 클래스"""
@@ -48,20 +50,12 @@ class ProductFinder:
                 # 특수 섹션은 포함시키되, 아래 로직에서 is_ad=True로 표시하여 원위치 유지
                 all_items = self.driver.find_elements(By.CSS_SELECTOR, "#product-list > li")
 
-                print(f"   ⚠️  data-id 없음 - 전체 li 요소 사용 (특수 섹션 포함)")
+                if Config.DEBUG_MODE:
+                    print(f"   ⚠️  data-id 없음 - 전체 li 요소 사용 (특수 섹션 포함)")
 
-            print(f"\n🔍 DOM 구조 분석:")
-            print(f"   전체 li 개수: {len(all_items)}")
-
-            # 디버깅: 모든 li의 class 출력 (처음 10개)
-            if len(all_items) > 0:
-                print(f"\n   📋 처음 10개 항목의 class 속성 (디버깅):")
-                for i, item in enumerate(all_items[:10]):
-                    item_class = item.get_attribute('class') or '(없음)'
-                    # ProductUnit 포함 여부 표시
-                    has_product_unit = 'ProductUnit' in item_class or 'productUnit' in item_class
-                    marker = "✅" if has_product_unit else "❌"
-                    print(f"      [{i}] {marker} class=\"{item_class[:80]}...\"" if len(item_class) > 80 else f"      [{i}] {marker} class=\"{item_class}\"")
+            if Config.DEBUG_MODE:
+                print(f"\n🔍 DOM 구조 분석:")
+                print(f"   전체 li 개수: {len(all_items)}")
 
             items_info = []
             organic_products = []
@@ -109,11 +103,13 @@ class ProductFinder:
                     # 링크가 없으면 특수 섹션 (class 체크를 통과한 경우)
                     if not link:
                         is_product_unit = 'productunit' in item_class_lower or 'product-unit' in item_class_lower
+                        ad_rank += 1
 
                         items_info.append({
                             "dom_index": dom_index,
                             "is_ad": True,  # 광고로 표시하여 원위치 유지
                             "rank": None,
+                            "ad_rank": ad_rank,  # 광고 번호 저장
                             "type": f"특수섹션({'ProductUnit' if is_product_unit else '링크없음'})",
                             'product_id': None,
                             'item_id': None,
@@ -148,6 +144,7 @@ class ProductFinder:
                             "dom_index": dom_index,
                             "is_ad": True,
                             "rank": None,
+                            "ad_rank": ad_rank,  # 광고 번호 저장
                             "type": "광고",
                             **url_params
                         })
@@ -156,28 +153,49 @@ class ProductFinder:
                         organic_rank += 1
                         organic_products.append(item)
                         organic_dom_indices.append(dom_index)
+
+                        # ⚠️ 중요: dictionary 병합 순서 주의!
+                        # **url_params를 먼저 적용한 후, "rank": organic_rank로 덮어써야 함
+                        #
+                        # 이유:
+                        # - url_params에도 "rank" 키가 있음 (URL의 rank 파라미터 값)
+                        # - URL의 rank는 광고를 포함한 DOM 순서이므로 잘못된 값
+                        # - organic_rank는 광고를 제외한 실제 순위 (1, 2, 3, 4...)
+                        #
+                        # 버그 사례 (2025-11-03 발견):
+                        # - 잘못된 순서: {"rank": organic_rank, **url_params}
+                        #   → url_params의 rank가 organic_rank를 덮어씀
+                        #   → 결과: 1,2,3,6,7,8... (4,5가 건너뛰어짐)
+                        #
+                        # - 올바른 순서: {**url_params, "rank": organic_rank}
+                        #   → organic_rank가 url_params의 rank를 덮어씀
+                        #   → 결과: 1,2,3,4,5,6... (정상)
                         items_info.append({
                             "dom_index": dom_index,
                             "is_ad": False,
-                            "rank": organic_rank,
-                            "type": "일반",
-                            **url_params
+                            **url_params,  # 1단계: URL 파라미터 적용 (rank 포함)
+                            "rank": organic_rank,  # 2단계: 올바른 순위로 덮어씀 (최종값)
+                            "type": "일반"
                         })
                         print(f"   [전체:{total_rank:2d}/일반:{organic_rank:2d}] - P:{url_params['product_id']} / I:{url_params['item_id']} / V:{url_params['vendor_item_id']}")
 
                 except Exception as e:
                     # 파싱 실패 시 광고로 간주
+                    ad_rank += 1
                     items_info.append({
                         "dom_index": dom_index,
                         "is_ad": True,
                         "rank": None,
+                        "ad_rank": ad_rank,  # 광고 번호 저장
                         "type": "파싱실패"
                     })
-                    print(f"   [{dom_index:2d}] 파싱 실패 (광고로 간주)")
+                    if Config.DEBUG_MODE:
+                        print(f"   [{dom_index:2d}] 파싱 실패 (광고로 간주)")
 
-            print(f"\n   ✅ 분석 완료:")
-            print(f"      - 일반 제품: {len(organic_products)}개")
-            print(f"      - 광고: {len(all_items) - len(organic_products)}개")
+            if Config.DEBUG_MODE:
+                print(f"\n   ✅ 분석 완료:")
+                print(f"      - 일반 제품: {len(organic_products)}개")
+                print(f"      - 광고: {len(all_items) - len(organic_products)}개")
 
             return {
                 "all_items": all_items,

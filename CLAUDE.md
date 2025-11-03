@@ -37,17 +37,18 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **🇰🇷 다시 한 번 강조: 모든 분석, 설명, 응답은 한국어로 작성하세요! 🇰🇷**
 
-Coupang Agent V2는 Selenium + undetected-chromedriver를 사용한 자동화 탐지 우회 도구입니다. 다양한 Chrome 버전(127-144)을 사용하여 TLS 핑거프린팅 다양성을 확보하고, VPN 통합으로 IP 우회 기능을 제공합니다.
+Coupang Agent V2는 Selenium + undetected-chromedriver를 사용한 자동화 탐지 우회 도구입니다. Chrome 130 (구버전 TLS) 및 144 (최신 버전)를 사용하여 TLS 핑거프린팅 다양성을 확보하고, VPN 통합으로 IP 우회 기능을 제공합니다.
 
 ## 핵심 실행 명령어
 
 ### Chrome 버전 설치
 ```bash
-# 모든 Chrome 버전 설치 (127~144)
-./install-chrome-versions.sh all
+# 권장 버전 설치
+./install-chrome-versions.sh 130  # 구버전 TLS (127-130 대표)
+./install-chrome-versions.sh 144  # 최신 버전 (131+ 대표)
 
-# 특정 버전만 설치
-./install-chrome-versions.sh 134
+# 또는 특정 버전
+./install-chrome-versions.sh <version>
 ```
 
 ### Agent 실행
@@ -57,7 +58,7 @@ Coupang Agent V2는 Selenium + undetected-chromedriver를 사용한 자동화 �
 # 아무 옵션 없이 실행 → 자동으로 인터랙티브 모드
 python3 agent.py
 ```
-- 21개 Chrome 버전 중 선택 (Stable 18 + 채널 3)
+- Chrome 130, 144 중 선택 (+ 채널: beta, dev, canary)
 - 마지막 사용 버전 기억 (`.last_version` 파일에 저장)
 - Enter만 누르면 이전 버전 재사용
 - 검색 키워드, 탐지 테스트도 대화형 선택
@@ -190,9 +191,9 @@ Chrome 131 이상은 WSL 환경에서 렌더러 프로세스 문제가 있어 �
 - 스크롤 시뮬레이션: 단계적 스크롤 + 랜덤 정지
 
 #### BrowserVersionManager
-- Chrome/Firefox 버전 스캔
+- Chrome 버전 스캔 (130, 144 + 채널)
 - 랜덤 버전 선택
-- 버전 그룹별 선택 (old: 127-130, new: 131-141, latest: 142-144)
+- 버전 그룹: old (130 = 127-130 대표), new (144 = 131+ 대표)
 
 ### 상태 관리 시스템
 
@@ -216,19 +217,20 @@ Chrome 131 이상은 WSL 환경에서 렌더러 프로세스 문제가 있어 �
 
 #### 차단 패턴 (IP 상태에 따라 변동)
 **패턴 A** (일반적인 경우):
-- **127-130**: 엄격한 IP rate limit → VPN 필수
-- **131+, Beta, Dev, Canary**: 상대적으로 완화 → VPN 없이도 가능할 수 있음
+- **130 (구버전)**: 엄격한 IP rate limit → VPN 필수
+- **144 (최신), 채널**: 상대적으로 완화 → VPN 없이도 가능할 수 있음
 
 **패턴 B** (IP가 심하게 차단된 경우):
 - **모든 버전**: IP rate limit 활성 → VPN 필요
 
 #### 권장 전략
-1. **127-130**: 항상 VPN 사용
-2. **131+, 채널**: VPN 없이 시도 → 차단되면 VPN 사용
+1. **Chrome 130**: 항상 VPN 사용
+2. **Chrome 144, 채널**: VPN 없이 시도 → 차단되면 VPN 사용
 3. **테스트**: 주기적으로 VPN 없이 테스트하여 rate limit 상태 확인
 
 #### 안정 버전
-- **134**: 현재 가장 안정적 (WSL 호환성 플래그 포함)
+- **130**: 구버전 TLS 대표 (127-130 그룹)
+- **144**: 최신 버전 (131+ 그룹)
 
 ### Chrome 채널 지원 (Beta/Dev/Canary)
 
@@ -281,7 +283,7 @@ python3 agent.py --version beta --vpn 0
 2. **랜덤 버전 선택**: `agent.py` 실행 시 버전 지정 없으면 자동 랜덤
    ```python
    # multi_browser_manager.py의 get_random_chrome() 사용
-   # 127-144 + Beta/Dev/Canary 중 랜덤 선택
+   # 130, 144 + Beta/Dev/Canary 중 랜덤 선택
    ```
 
 3. **주기적 채널 업데이트**: Beta/Dev/Canary는 매주 새 버전 출시
@@ -330,10 +332,12 @@ agent/
 │   ├── utils/
 │   │   └── human_behavior_selenium.py   # 사람 행동 시뮬레이션
 │   └── constants.py              # 상수 및 상태 정의
-├── chrome-version/               # Chrome 바이너리 (127~144)
-│   └── {version}/
-│       ├── chrome-linux64/chrome
-│       └── VERSION
+├── chrome-version/               # Chrome 바이너리
+│   ├── 130/                      # 구버전 TLS (127-130 대표)
+│   ├── 144/                      # 최신 버전 (131+ 대표)
+│   ├── beta/                     # Chrome Beta 채널
+│   ├── dev/                      # Chrome Dev 채널
+│   └── canary/                   # Chrome Canary 채널
 └── browser-profiles/             # 프로필 디렉토리
     ├── chrome-{version}/         # 버전별 독립 프로필
     │   ├── Default/              # 쿠키, 세션, 로컬스토리지
@@ -375,7 +379,7 @@ cd ~/vpn-ip-rotation/client
 ### "http2_protocol_error" 탐지
 IP 차단 또는 버전 차단. VPN 사용 권장:
 ```bash
-python3 agent.py --version 127 --vpn 0
+python3 agent.py --version 130 --vpn 0
 ```
 
 ### 캐시 공간 부족
@@ -401,9 +405,9 @@ core.clean_old_cache(max_age_hours=24)  # 24시간 이상 미사용 캐시 삭�
 1. **프로필 재사용**: 매번 새 프로필 생성하지 말고 `use_profile=True` 사용
 2. **공유 캐시**: 디스크 I/O 감소 및 트래픽 절약
 3. **버전 선택 전략**:
-   - 차단 우려 시: `--version 134` (안정적)
-   - TLS 다양성 필요 시: 랜덤 버전 사용
-   - IP 차단 우회: VPN + old 그룹 (127-130)
+   - 구버전 TLS: `--version 130`
+   - 최신 버전: `--version 144`
+   - IP 차단 우회: VPN + Chrome 130
 
 ## 스크린샷 업로드 기능
 
@@ -444,7 +448,7 @@ python3 agent.py --version 134 --keyword "노트북"
 
 ```
 uploaded_screenshots/
-├── chrome-127/
+├── chrome-130/
 │   ├── local/
 │   │   ├── 노트북_before_viewport_20251101_123456.png
 │   │   └── 노트북_after_viewport_20251101_123457.png
@@ -492,5 +496,105 @@ app.run(host='0.0.0.0', port=8000)
 **❌ 영어로 응답하는 것은 절대 금지됩니다!**
 
 **🔴 이 규칙을 위반하지 마세요! 🔴**
+
+---
+
+---
+
+## 📝 코드 관리 원칙 (2025-11-03 업데이트)
+
+### 중요한 원칙
+
+**⚠️ 문서화 정책:**
+1. **중요한 설명은 코드에 직접 주석으로 작성**
+2. **별도 문서는 시간이 지나면 업데이트를 따라가지 못함**
+3. **함수/변수 용도는 코드에서 바로 알 수 있도록**
+4. **CLAUDE.md, README.md는 관리 차원의 가이드만**
+
+### 순수 오리지널 워크플로우
+
+**2025-11-03: Edit 모드 완전 제거 완료**
+
+- 워크플로우: `Main → Search → Match → Highlight → Watermark → Capture → Upload`
+- Edit 모드 관련 코드 모두 제거
+- 순위 조작, 페이지 이동, DOM 교체 기능 삭제
+- 파일 크기: 1,485 라인 → 748 라인 (50% 감소)
+
+### 핵심 버그 및 주의사항
+
+#### 1. Dictionary 병합 순서 버그 (2025-11-03 발견)
+
+**위치**: `/home/tech/agent/lib/modules/product_finder.py:169-175`
+
+**문제**: `**url_params`의 위치에 따라 rank 값이 잘못 저장됨
+
+**잘못된 코드**:
+```python
+items_info.append({
+    "rank": organic_rank,  # 1, 2, 3, 4, 5...
+    **url_params  # url_params의 "rank"가 덮어씀!
+})
+# 결과: 1, 2, 3, 6, 7, 8... (4, 5 건너뛰어짐)
+```
+
+**올바른 코드**:
+```python
+items_info.append({
+    **url_params,  # 먼저 적용
+    "rank": organic_rank  # 올바른 값으로 덮어씀
+})
+# 결과: 1, 2, 3, 4, 5, 6... (정상)
+```
+
+**영향**: 
+- debug-overlay의 순위 표시 오류
+- watermark 위치 계산 오류
+- Edit 모드의 순위 조작 버그 원인
+
+**해결**: product_finder.py에 상세한 주석 추가 (Line 153-168)
+
+#### 2. 워터마크 중복 표시 제거
+
+**제거된 워터마크**:
+- 파란색 `custom-rank-overlay` (Edit 모드용)
+- 초록색 타겟 상품 워터마크 (Edit 모드용)
+
+**현재 워터마크**:
+- 쿠팡 원본 (1~10위, 빨강색)
+- 커스텀 워터마크 (11위 이상, 주황색 `#FF6B00`, 좌측 중앙)
+
+### 모듈 책임
+
+#### Core Modules
+- `browser_core_uc.py`: undetected-chromedriver 관리
+- `coupang_handler_selenium.py`: 쿠팡 페이지 조작
+- `product_finder.py`: 상품 검색 및 매칭 ⚠️ rank 버그 주의!
+
+#### Workflow
+- `search_workflow.py`: 순수 오리지널 워크플로우
+  - Edit 모드 제거 완료
+  - 불필요한 import, 변수 제거 완료
+
+#### Utilities
+- `watermark_display.py`: 워터마크 표시 (11위 이상)
+- `highlight_preset.py`: 상품 강조 표시
+- `screenshot_processor.py`: 스크린샷 캡처 및 업로드
+
+### 코드 수정 시 체크리스트
+
+1. **주석 작성**: 중요한 로직은 코드에 직접 주석 작성
+2. **Dictionary 병합**: `**dict` 순서 확인 (덮어쓰기 주의)
+3. **import 정리**: 사용하지 않는 import 제거
+4. **변수 정리**: 사용하지 않는 변수 제거
+5. **한국어**: 모든 주석, 출력, 문서는 한국어로
+
+### 디버깅 팁
+
+**디버그 파일 생성**:
+- 위치: `/home/tech/agent/debug_logs/debug_overlay_*.json`
+- 내용: items_info 데이터 (rank, dom_index, is_ad 등)
+- 용도: 콘솔 로그만으로 발견할 수 없는 버그 추적
+
+**활성화**: `Config.ENABLE_DEBUG_OVERLAY = True` (기본값)
 
 ---

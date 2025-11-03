@@ -60,12 +60,15 @@ log_info "Setting browser-profiles directory permissions..."
 
 PROFILES_DIR="$SCRIPT_DIR/browser-profiles"
 if [ -d "$PROFILES_DIR" ]; then
-    chmod -R o+rwX "$PROFILES_DIR" 2>/dev/null || log_warn "Could not set full permissions on $PROFILES_DIR"
-    log_success "Browser profiles writable by VPN users"
+    # 상위 디렉토리만 755 (VPN 사용자들이 접근만 가능하면 됨)
+    # 각 VPN은 자신의 프로필 디렉토리(vpnN-chrome-XXX/)를 생성하므로
+    # 개별 프로필은 권한 설정 불필요 (각자 소유)
+    chmod 755 "$PROFILES_DIR" 2>/dev/null || log_warn "Could not set permissions on $PROFILES_DIR"
+    log_success "Browser profiles directory accessible (755)"
 else
     mkdir -p "$PROFILES_DIR"
-    chmod o+rwx "$PROFILES_DIR"
-    log_success "Browser profiles directory created"
+    chmod 755 "$PROFILES_DIR"
+    log_success "Browser profiles directory created (755)"
 fi
 
 # ===================================================================
@@ -74,14 +77,20 @@ fi
 
 log_info "Setting undetected_chromedriver directory permissions..."
 
+# 상위 디렉토리 권한 설정 (접근 가능하도록)
+chmod 755 "$HOME_DIR/.local" 2>/dev/null || true
+chmod 755 "$HOME_DIR/.local/share" 2>/dev/null || true
+
 UC_DIR="$HOME_DIR/.local/share/undetected_chromedriver"
 if [ -d "$UC_DIR" ]; then
-    chmod -R o+rwX "$UC_DIR" 2>/dev/null || log_warn "Could not set permissions on $UC_DIR"
-    log_success "Undetected ChromeDriver directory writable"
+    # 재귀적으로 777/666 설정
+    find "$UC_DIR" -type d -exec chmod 777 {} \; 2>/dev/null || log_warn "Could not set directory permissions"
+    find "$UC_DIR" -type f -exec chmod 666 {} \; 2>/dev/null || log_warn "Could not set file permissions"
+    log_success "Undetected ChromeDriver directory fully writable (777/666)"
 else
     mkdir -p "$UC_DIR"
-    chmod o+rwx "$UC_DIR"
-    log_success "Undetected ChromeDriver directory created"
+    chmod 777 "$UC_DIR"
+    log_success "Undetected ChromeDriver directory created with 777"
 fi
 
 # ===================================================================
@@ -90,14 +99,19 @@ fi
 
 log_info "Setting selenium cache directory permissions..."
 
+# 상위 디렉토리 권한 설정 (접근 가능하도록)
+chmod 755 "$HOME_DIR/.cache" 2>/dev/null || true
+
 SELENIUM_CACHE="$HOME_DIR/.cache/selenium"
 if [ -d "$SELENIUM_CACHE" ]; then
-    chmod -R o+rwX "$SELENIUM_CACHE" 2>/dev/null || log_warn "Could not set permissions on $SELENIUM_CACHE"
-    log_success "Selenium cache directory writable"
+    # 재귀적으로 777/666 설정
+    find "$SELENIUM_CACHE" -type d -exec chmod 777 {} \; 2>/dev/null || log_warn "Could not set directory permissions"
+    find "$SELENIUM_CACHE" -type f -exec chmod 666 {} \; 2>/dev/null || log_warn "Could not set file permissions"
+    log_success "Selenium cache directory fully writable (777/666)"
 else
     mkdir -p "$SELENIUM_CACHE"
-    chmod o+rwx "$SELENIUM_CACHE"
-    log_success "Selenium cache directory created"
+    chmod 777 "$SELENIUM_CACHE"
+    log_success "Selenium cache directory created with 777"
 fi
 
 # ===================================================================

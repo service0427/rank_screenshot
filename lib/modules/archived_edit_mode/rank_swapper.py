@@ -8,7 +8,7 @@ import time
 from typing import Optional, Dict, Tuple
 from selenium.webdriver.common.by import By
 from selenium.webdriver.remote.webelement import WebElement
-from lib.modules.rank_manipulator import RankManipulator
+from lib.modules.rank.watermark_manager import WatermarkManager
 
 
 class RankSwapper:
@@ -18,12 +18,11 @@ class RankSwapper:
         """
         Args:
             driver: Selenium WebDriver 인스턴스
-            finder: ProductFinder 인스턴스 (워터마크 재정립용)
+            finder: ProductFinder 인스턴스
         """
         self.driver = driver
         self.finder = finder
-        # 워터마크 재정립을 위해 RankManipulator의 메서드 재사용
-        self._rank_manipulator = RankManipulator(driver, finder)
+        self.watermark_manager = WatermarkManager(driver)
 
     def find_organic_product_by_rank(self, target_rank: int) -> Optional[Tuple[WebElement, int]]:
         """
@@ -193,19 +192,11 @@ class RankSwapper:
             print(f"   ✓ {rank_b}등 (DOM {dom_idx_b}) 찾기 완료")
 
             # 2. 워터마크 백업 및 제거 (1페이지 규칙)
-            print(f"\n   📦 1~10등 워터마크 백업 중...")
             structure = self.finder.analyze_product_list_structure()
-            all_products = [{'element': elem} for elem in structure['organic_products']]
+            organic_elements = structure['organic_products']
 
-            # 워터마크 백업
-            watermark_backup = self._rank_manipulator._backup_watermark_style(all_products)
-            if watermark_backup:
-                print(f"      ✓ 워터마크 스타일 백업 완료")
-
-            # 워터마크 제거
-            print(f"\n   🗑️  1~10등 워터마크 제거 중...")
-            removed_count = self._rank_manipulator._remove_all_watermarks(all_products)
-            print(f"      ✓ {removed_count}개 워터마크 제거 완료")
+            # watermark_manager를 사용하여 백업 및 제거
+            self.watermark_manager.backup_and_remove(organic_elements, count=10)
 
             # 3. 내용 복제 및 교환 (워터마크 없는 상태로 swap)
             print(f"\n   🔀 상품 내용 교환 중 (innerHTML swap)...")
@@ -233,18 +224,12 @@ class RankSwapper:
             print(f"      ✓ 상품 내용 교환 완료")
 
             # 4. 워터마크 재생성 (위치 기준으로 1~10)
-            print(f"\n   🏷️  1~10등 워터마크 재생성 중 (위치 기준)...")
             # DOM에서 현재 상품 목록 다시 가져오기 (swap 후)
             structure = self.finder.analyze_product_list_structure()
-            all_products_after = [{'element': elem} for elem in structure['organic_products']]
+            organic_elements_after = structure['organic_products']
 
-            # 백업한 스타일로 워터마크 재생성
-            if watermark_backup:
-                created_count = self._rank_manipulator._create_new_watermarks(
-                    product_elements=[p['element'] for p in all_products_after[:10]],
-                    style_info=watermark_backup
-                )
-                print(f"      ✓ {created_count}개 워터마크 생성 완료")
+            # watermark_manager를 사용하여 롤백
+            self.watermark_manager.restore(organic_elements_after, count=10)
 
             print(f"\n✅ Simple Swap 완료: {rank_a}등 ↔ {rank_b}등")
             return {
@@ -265,14 +250,28 @@ class RankSwapper:
         """
         순위 변경 후 상품 순서 확인 및 현재 상품 목록 반환
 
-        ⚠️  중요: RankManipulator의 verify_new_order()를 재사용하여
-        일관성 유지
-
         Args:
             expected_order: 기대하는 상품 순서 (사용하지 않음)
 
         Returns:
             현재 DOM의 상품 정보 리스트
         """
-        # RankManipulator의 verify_new_order() 메서드를 직접 호출
-        return self._rank_manipulator.verify_new_order(expected_order)
+        try:
+            print(f"\n🔍 재배치 후 순서 확인 중...")
+
+            # DOM에서 현재 순서대로 상품 요소들 다시 가져오기
+            structure = self.finder.analyze_product_list_structure()
+            new_organic_products_elements = structure['organic_products']
+
+            # WebElement 리스트를 딕셔너리 리스트로 변환
+            new_organic_products = self.finder.extract_all_products_params(new_organic_products_elements)
+
+            print(f"✅ 재배치 확인 완료: {len(new_organic_products)}개 일반 상품\n")
+
+            return new_organic_products
+
+        except Exception as e:
+            print(f"❌ 재배치 확인 실패: {e}")
+            import traceback
+            traceback.print_exc()
+            return expected_order

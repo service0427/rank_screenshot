@@ -157,6 +157,7 @@ class BrowserCoreUC:
         self,
         version: Optional[str] = None,
         use_profile: bool = True,
+        fresh_profile: bool = False,
         headless: bool = False,
         window_width: int = 1300,
         window_height: int = 1200,
@@ -170,6 +171,7 @@ class BrowserCoreUC:
         Args:
             version: Chrome 버전 (None이면 랜덤)
             use_profile: 프로필 사용 여부
+            fresh_profile: True면 프로필 완전 삭제 후 재생성 (기본: False)
             headless: 헤드리스 모드 (권장: False)
             window_width: 창 너비 (기본: 1300)
             window_height: 창 높이 (기본: 1200)
@@ -220,15 +222,18 @@ class BrowserCoreUC:
             # 일반 + 단일: 공통 프로필
             self.profile_dir = Path(Config.PROFILE_DIR_BASE) / f"chrome-{version}"
 
-        # 프로필 디렉토리 생성 및 권한 설정
-        self.profile_dir.mkdir(parents=True, exist_ok=True)
-        # VPN 사용자도 읽기/쓰기 가능하도록 권한 설정 (rwxrwxrwx)
-        # instance 기반 프로필은 여러 VPN 사용자가 공유할 수 있음
-        try:
-            import stat
-            self.profile_dir.chmod(stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)
-        except Exception:
-            pass  # 권한 설정 실패해도 계속 진행
+        # 프로필 디렉토리 처리
+        # VPN 번호별로 이미 분리되어 있으므로 각 사용자가 자신의 디렉토리만 사용
+        if fresh_profile and self.profile_dir.exists():
+            # 옵션 1: 프로필 완전 삭제 후 재생성
+            import shutil
+            print(f"🗑️  Deleting old profile: {self.profile_dir}")
+            shutil.rmtree(self.profile_dir, ignore_errors=True)
+            self.profile_dir.mkdir(parents=True, exist_ok=True)
+            print(f"✅ Fresh profile created")
+        else:
+            # 옵션 2 (기본): 프로필 유지
+            self.profile_dir.mkdir(parents=True, exist_ok=True)
 
         print(f"🚀 Launching Chrome {version} with undetected-chromedriver...")
         print(f"   Path: {chrome_path}")
@@ -236,6 +241,10 @@ class BrowserCoreUC:
         print(f"   Debug Port: {9222 + self.instance_id}")
         if use_profile:
             print(f"   Profile: {self.profile_dir}")
+            if fresh_profile:
+                print(f"   Mode: Fresh profile (완전 삭제 후 재생성)")
+            else:
+                print(f"   Mode: Reuse profile (쿠키/세션/스토리지만 삭제 예정)")
 
         # Chrome 옵션
         # 프로필 사용 시: 저장된 창 위치 자동 복원 (window_position 인자 없음)

@@ -38,7 +38,7 @@ class WorkerStats:
             }
 
 
-def run_worker(worker_id: int, iterations: int, stats: WorkerStats, edit_mode: str = None, vpn_list: list = None):
+def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode: str = None, vpn_list: list = None):
     """
     개별 워커 실행
 
@@ -46,7 +46,7 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, edit_mode: s
         worker_id: 워커 ID (1부터 시작)
         iterations: 반복 횟수
         stats: 통계 객체
-        edit_mode: Edit 모드 ("edit", "edit2", None)
+        adjust_mode: Adjust 모드 ("adjust", "adjust2", None)
         vpn_list: VPN 번호 리스트 (None: VPN 사용 안 함, ['L', '0', '1'] 등)
     """
     print(f"[Worker-{worker_id}] 시작 - {iterations}회 반복 (instance_id={worker_id})")
@@ -78,11 +78,11 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, edit_mode: s
             if selected_vpn and selected_vpn != 'L':
                 cmd.extend(["--vpn", str(selected_vpn)])
 
-            # Edit 모드 옵션 추가 (선택 사항)
-            if edit_mode == "edit":
-                cmd.append("--edit")
-            elif edit_mode == "edit2":
-                cmd.append("--edit2")
+            # Adjust 모드 옵션 추가 (선택 사항)
+            if adjust_mode == "adjust":
+                cmd.append("--adjust")
+            elif adjust_mode == "adjust2":
+                cmd.append("--adjust2")
 
             # 나머지 옵션 추가
             cmd.extend([
@@ -122,14 +122,14 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 사용 예시:
-  # 3개 스레드로 각각 10회 실행 (기본: 순위 조작 없음)
+  # 3개 스레드로 각각 10회 실행 (기본: 순위 조정 없음)
   python3 run_workers.py --threads 3 --iterations 10
 
-  # Edit 모드로 5개 스레드 실행
-  python3 run_workers.py -t 5 -i 20 --edit
+  # Adjust 모드로 5개 스레드 실행
+  python3 run_workers.py -t 5 -i 20 --adjust
 
-  # Edit2 (Simple Swap) 모드로 실행
-  python3 run_workers.py -t 3 -i 10 --edit2
+  # Adjust2 (Simple Swap) 모드로 실행
+  python3 run_workers.py -t 3 -i 10 --adjust2
 
   # VPN 랜덤 선택 (0-5번 중 랜덤)
   python3 run_workers.py -t 3 -i 10 --vpn=0,1,2,3,4,5
@@ -154,15 +154,15 @@ def main():
     )
 
     parser.add_argument(
-        "--edit",
+        "--adjust",
         action="store_true",
-        help="Edit 모드 활성화 (DOM 재구성)"
+        help="Adjust 모드 활성화 (미래 개발용)"
     )
 
     parser.add_argument(
-        "--edit2",
+        "--adjust2",
         action="store_true",
-        help="Edit2 모드 활성화 (Simple Swap)"
+        help="Adjust2 모드 활성화 (미래 개발용)"
     )
 
     parser.add_argument(
@@ -183,15 +183,15 @@ def main():
         print("❌ 반복 횟수는 1 이상이어야 합니다")
         return
 
-    # Edit 모드 결정
-    edit_mode = None
-    if args.edit and args.edit2:
-        print("❌ --edit와 --edit2는 동시에 사용할 수 없습니다")
+    # Adjust 모드 결정
+    adjust_mode = None
+    if args.adjust and args.adjust2:
+        print("❌ --adjust와 --adjust2는 동시에 사용할 수 없습니다")
         return
-    elif args.edit:
-        edit_mode = "edit"
-    elif args.edit2:
-        edit_mode = "edit2"
+    elif args.adjust:
+        adjust_mode = "adjust"
+    elif args.adjust2:
+        adjust_mode = "adjust2"
 
     # VPN 리스트 파싱
     vpn_list = None
@@ -212,8 +212,8 @@ def main():
     print(f"총 작업 수: {args.threads * args.iterations}")
     if vpn_list:
         print(f"VPN 리스트: {', '.join(vpn_list)} (랜덤 선택)")
-    if edit_mode:
-        print(f"Edit 모드: {edit_mode}")
+    if adjust_mode:
+        print(f"Adjust 모드: {adjust_mode}")
     print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     print("=" * 60 + "\n")
 
@@ -227,7 +227,7 @@ def main():
     for worker_id in range(1, args.threads + 1):
         thread = threading.Thread(
             target=run_worker,
-            args=(worker_id, args.iterations, stats, edit_mode, vpn_list),
+            args=(worker_id, args.iterations, stats, adjust_mode, vpn_list),
             name=f"Worker-{worker_id}"
         )
         threads.append(thread)

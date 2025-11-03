@@ -184,16 +184,45 @@ class Config:
     # Browser Profiles
     PROFILE_DIR_BASE = "/home/tech/agent/browser-profiles"
 
-    # Watermark Settings (11+ rank display)
-    WATERMARK_POSITION_TOP = "10px"
-    WATERMARK_POSITION_RIGHT = "10px"  # 오른쪽 상단
-    WATERMARK_BG_COLOR = "#FF6B00"  # 쿠팡 오렌지색
-    WATERMARK_TEXT_COLOR = "white"
-    WATERMARK_PADDING = "4px 8px"
-    WATERMARK_FONT_SIZE = "12px"
-    WATERMARK_FONT_WEIGHT = "bold"
-    WATERMARK_BORDER_RADIUS = "4px"
-    WATERMARK_Z_INDEX = "10"
-    WATERMARK_FONT_FAMILY = "Arial, sans-serif"
-    WATERMARK_LINE_HEIGHT = "1"
-    WATERMARK_MIN_RANK = 11  # 11등부터 워터마크 표시
+    # Debug Settings
+    DEBUG_MODE = False  # 디버그 모드 (--debug 플래그로 설정됨, 상세 로그 및 파일 저장)
+    ENABLE_DEBUG_OVERLAY = True  # 디버깅 오버레이 표시 여부 ([전체:N/일반:M] 형식)
+
+    # Highlight Settings (상품 강조 표시 + 순위 배지 통합)
+    ENABLE_HIGHLIGHT = True  # 하이라이트(P/I/V 포함) 표시 여부 (False: 표시 안 함)
+
+    # 테두리 설정
+    HIGHLIGHT_BORDER_WIDTH = 5
+    HIGHLIGHT_BORDER_COLOR = "#FF0000"
+    HIGHLIGHT_BORDER_STYLE = "solid"  # solid, dashed, dotted
+    HIGHLIGHT_BORDER_OFFSET = -5
+
+    # 배경 오버레이 설정
+    HIGHLIGHT_BACKGROUND_OVERLAY = True
+    HIGHLIGHT_BACKGROUND_COLOR = "rgba(255, 255, 0, 0.15)"  # 연한 노란색
+
+    # P/I/V 라벨 표시 설정
+    HIGHLIGHT_SHOW_PIV_LABELS = True
+    HIGHLIGHT_LABEL_FONT_SIZE = 15
+    HIGHLIGHT_LABEL_BACKGROUND = "rgba(0, 0, 0, 0.85)"
+    HIGHLIGHT_LABEL_TEXT_COLOR = "#CCCCCC"  # 기본 텍스트 색상
+    HIGHLIGHT_LABEL_PADDING = 10
+    HIGHLIGHT_LABEL_BORDER_RADIUS = 4
+    HIGHLIGHT_MATCH_COLOR = "#FFFF00"  # 매칭된 필드 강조 색상 (노란색)
+    # 위치 설정 (CSS 값 직접 지정)
+    HIGHLIGHT_LABEL_TOP = "10px"
+    HIGHLIGHT_LABEL_RIGHT = "10px"
+    HIGHLIGHT_LABEL_BOTTOM = None
+    HIGHLIGHT_LABEL_LEFT = None
+
+    # 순위 배지 설정
+    HIGHLIGHT_SHOW_RANK_BADGE = True
+    HIGHLIGHT_RANK_BADGE_MIN_RANK = 11  # 최소 순위 (11등 이상만 표시, 10등 이하는 표시 안 함)
+    HIGHLIGHT_RANK_BADGE_SIZE = 45
+    HIGHLIGHT_RANK_BADGE_COLOR = "#FF6B6B"
+    HIGHLIGHT_RANK_BADGE_TEXT_COLOR = "#FFFFFF"
+    # 위치 설정 (CSS 값 직접 지정)
+    HIGHLIGHT_RANK_BADGE_TOP = "10px"
+    HIGHLIGHT_RANK_BADGE_RIGHT = None
+    HIGHLIGHT_RANK_BADGE_BOTTOM = None
+    HIGHLIGHT_RANK_BADGE_LEFT = "10px"

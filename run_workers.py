@@ -8,6 +8,7 @@ import subprocess
 import threading
 import time
 import argparse
+import random
 from datetime import datetime
 from pathlib import Path
 
@@ -37,7 +38,7 @@ class WorkerStats:
             }
 
 
-def run_worker(worker_id: int, iterations: int, stats: WorkerStats, edit_mode: str = None):
+def run_worker(worker_id: int, iterations: int, stats: WorkerStats, edit_mode: str = None, vpn_list: list = None):
     """
     개별 워커 실행
 
@@ -46,6 +47,7 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, edit_mode: s
         iterations: 반복 횟수
         stats: 통계 객체
         edit_mode: Edit 모드 ("edit", "edit2", None)
+        vpn_list: VPN 번호 리스트 (None: VPN 사용 안 함, ['L', '0', '1'] 등)
     """
     print(f"[Worker-{worker_id}] 시작 - {iterations}회 반복 (instance_id={worker_id})")
 
@@ -53,7 +55,16 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, edit_mode: s
         try:
             start_time = time.time()
 
-            print(f"\n[Worker-{worker_id}] 작업 {i}/{iterations} 시작")
+            # VPN 랜덤 선택
+            selected_vpn = None
+            if vpn_list:
+                selected_vpn = random.choice(vpn_list)
+                if selected_vpn == 'L':
+                    print(f"\n[Worker-{worker_id}] 작업 {i}/{iterations} 시작 (VPN: Local)")
+                else:
+                    print(f"\n[Worker-{worker_id}] 작업 {i}/{iterations} 시작 (VPN: {selected_vpn})")
+            else:
+                print(f"\n[Worker-{worker_id}] 작업 {i}/{iterations} 시작")
             print("=" * 60)
 
             # agent.py 실행 명령어 구성 (기본: --work-api --version random --close)
@@ -62,6 +73,10 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, edit_mode: s
                 "--work-api",
                 "--version", "random",
             ]
+
+            # VPN 옵션 추가 (L이 아닌 경우만)
+            if selected_vpn and selected_vpn != 'L':
+                cmd.extend(["--vpn", str(selected_vpn)])
 
             # Edit 모드 옵션 추가 (선택 사항)
             if edit_mode == "edit":
@@ -115,6 +130,12 @@ def main():
 
   # Edit2 (Simple Swap) 모드로 실행
   python3 run_workers.py -t 3 -i 10 --edit2
+
+  # VPN 랜덤 선택 (0-5번 중 랜덤)
+  python3 run_workers.py -t 3 -i 10 --vpn=0,1,2,3,4,5
+
+  # 로컬 + VPN 0-5번 중 랜덤 선택 (L은 로컬/VPN 없음)
+  python3 run_workers.py -t 3 -i 10 --vpn=L,0,1,2,3,4,5
         """
     )
 
@@ -144,6 +165,13 @@ def main():
         help="Edit2 모드 활성화 (Simple Swap)"
     )
 
+    parser.add_argument(
+        "--vpn",
+        type=str,
+        default=None,
+        help="VPN 번호 리스트 (콤마로 구분, 예: L,0,1,2 - L은 로컬/VPN 없음)"
+    )
+
     args = parser.parse_args()
 
     # 입력 검증
@@ -165,6 +193,16 @@ def main():
     elif args.edit2:
         edit_mode = "edit2"
 
+    # VPN 리스트 파싱
+    vpn_list = None
+    if args.vpn:
+        vpn_list = [vpn.strip().upper() for vpn in args.vpn.split(",")]
+        # 유효성 검사
+        for vpn in vpn_list:
+            if vpn != 'L' and not vpn.isdigit():
+                print(f"❌ 잘못된 VPN 값: {vpn} (L 또는 숫자만 가능)")
+                return
+
     # 시작 정보 출력
     print("\n" + "=" * 60)
     print("🚀 멀티 워커 실행")
@@ -172,6 +210,8 @@ def main():
     print(f"스레드 개수: {args.threads}")
     print(f"반복 횟수: {args.iterations} (스레드당)")
     print(f"총 작업 수: {args.threads * args.iterations}")
+    if vpn_list:
+        print(f"VPN 리스트: {', '.join(vpn_list)} (랜덤 선택)")
     if edit_mode:
         print(f"Edit 모드: {edit_mode}")
     print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -187,7 +227,7 @@ def main():
     for worker_id in range(1, args.threads + 1):
         thread = threading.Thread(
             target=run_worker,
-            args=(worker_id, args.iterations, stats, edit_mode),
+            args=(worker_id, args.iterations, stats, edit_mode, vpn_list),
             name=f"Worker-{worker_id}"
         )
         threads.append(thread)

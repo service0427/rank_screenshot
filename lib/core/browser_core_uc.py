@@ -236,19 +236,42 @@ class BrowserCoreUC:
         # 프로필 디렉토리 처리
         # VPN 번호별로 이미 분리되어 있으므로 각 사용자가 자신의 디렉토리만 사용
         print(f"📁 Profile directory: {self.profile_dir}")
+        print(f"   Parent directory: {self.profile_dir.parent}")
+        print(f"   Current user: {os.getenv('USER', 'unknown')}")
+        print(f"   VPN user: vpn{vpn_num}" if vpn_num else "   VPN: Not used")
+
+        # 상위 디렉토리 존재 및 권한 확인
+        parent_dir = self.profile_dir.parent
+        if not parent_dir.exists():
+            print(f"   ❌ Parent directory does not exist: {parent_dir}")
+            raise ValueError(f"Parent directory does not exist: {parent_dir}")
+
+        import stat
+        parent_stat = parent_dir.stat()
+        parent_mode = stat.filemode(parent_stat.st_mode)
+        print(f"   Parent directory permissions: {parent_mode}")
+
         print(f"   Creating profile directory...")
 
-        if fresh_profile and self.profile_dir.exists():
-            # 옵션 1: 프로필 완전 삭제 후 재생성
-            import shutil
-            print(f"🗑️  Deleting old profile: {self.profile_dir}")
-            shutil.rmtree(self.profile_dir, ignore_errors=True)
-            self.profile_dir.mkdir(parents=True, exist_ok=True)
-            print(f"✅ Fresh profile created")
-        else:
-            # 옵션 2 (기본): 프로필 유지
-            self.profile_dir.mkdir(parents=True, exist_ok=True)
-            print(f"✅ Profile directory ready")
+        try:
+            if fresh_profile and self.profile_dir.exists():
+                # 옵션 1: 프로필 완전 삭제 후 재생성
+                import shutil
+                print(f"🗑️  Deleting old profile: {self.profile_dir}")
+                shutil.rmtree(self.profile_dir, ignore_errors=True)
+                self.profile_dir.mkdir(parents=True, exist_ok=True)
+                print(f"✅ Fresh profile created")
+            else:
+                # 옵션 2 (기본): 프로필 유지
+                self.profile_dir.mkdir(parents=True, exist_ok=True)
+                print(f"✅ Profile directory ready")
+        except Exception as e:
+            print(f"   ❌ Failed to create profile directory: {e}")
+            print(f"   Directory: {self.profile_dir}")
+            print(f"   Parent: {parent_dir}")
+            print(f"   Parent exists: {parent_dir.exists()}")
+            print(f"   Parent permissions: {oct(parent_stat.st_mode)[-3:]}")
+            raise
 
         print(f"🚀 Launching Chrome {version} with undetected-chromedriver...")
         print(f"   Path: {chrome_path}")

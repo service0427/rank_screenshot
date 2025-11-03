@@ -68,7 +68,7 @@ class WatermarkManager:
             traceback.print_exc()
             return False
 
-    def recreate_watermarks(self, items: List[WebElement], count: int = 10) -> bool:
+    def recreate_watermarks(self, items: List[WebElement], count: int = 10, offset: int = 0) -> bool:
         """
         1~N등의 워터마크 재생성
 
@@ -79,16 +79,22 @@ class WatermarkManager:
         Args:
             items: 일반 상품 요소 리스트
             count: 재생성할 워터마크 개수 (기본: 10)
+            offset: 누적 순위 오프셋 (이전 페이지들의 상품 개수, 기본: 0)
 
         Returns:
             성공 여부
         """
         try:
-            print(f"\n🏷️  순위 워터마크 재생성 중 (1~{count}등)...")
+            # 실제 표시 범위 계산 (offset 고려)
+            start_rank = offset + 1
+            end_rank = offset + count
+            print(f"\n🏷️  순위 워터마크 재생성 중 ({start_rank}~{end_rank}등)...")
 
             created_count = 0
-            for rank in range(1, min(count + 1, len(items) + 1)):
-                item = items[rank - 1]
+            for page_rank in range(1, min(count + 1, len(items) + 1)):
+                item = items[page_rank - 1]
+                # 실제 전체 순위 = offset + 페이지 내 순위
+                actual_rank = offset + page_rank
 
                 try:
                     # 워터마크 재생성
@@ -125,12 +131,12 @@ class WatermarkManager:
 
                         // 워터마크 추가
                         container.appendChild(mark);
-                    """, item, rank)
+                    """, item, actual_rank)
 
                     created_count += 1
 
                 except Exception as e:
-                    print(f"   ⚠️  {rank}등 워터마크 생성 실패: {e}")
+                    print(f"   ⚠️  {actual_rank}등 워터마크 생성 실패: {e}")
 
             if created_count > 0:
                 print(f"   ✓ {created_count}개 워터마크 생성 완료")

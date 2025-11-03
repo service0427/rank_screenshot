@@ -26,7 +26,8 @@ class RankModifier:
         all_items: List[WebElement],
         items_info: List[Dict],
         source_rank: int,
-        target_rank: int
+        target_rank: int,
+        rank_offset: int = 0
     ) -> Dict:
         """
         배열 재정렬 방식으로 순위 변경
@@ -40,6 +41,7 @@ class RankModifier:
             items_info: 각 항목의 정보 (is_ad, dom_index, rank)
             source_rank: 원본 순위 (예: 15, 광고 제외 순위)
             target_rank: 목표 순위 (예: 3, 광고 제외 순위)
+            rank_offset: 누적 순위 오프셋 (이전 페이지들의 상품 개수, 기본: 0)
 
         Returns:
             {
@@ -120,8 +122,8 @@ class RankModifier:
             print(f"      - 일반 상품: {len(fresh_organics)}개")
             print(f"      - 광고: {len(fresh_all_items) - len(fresh_organics)}개")
 
-            # 7. 워터마크 재생성 (1~10등)
-            self.watermark_manager.recreate_watermarks(fresh_organics, count=10)
+            # 7. 워터마크 재생성 (누적 offset 고려)
+            self.watermark_manager.recreate_watermarks(fresh_organics, count=10, offset=rank_offset)
 
             print(f"\n✅ 순위 변경 완료:")
             print(f"   • {source_rank}등 → {target_rank}등 위치")

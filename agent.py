@@ -30,7 +30,7 @@ UPLOAD_SERVER_URL = "http://220.121.120.83/toprekr/upload.php"
 
 # API 통합 설정
 ENABLE_WORK_API = False  # 작업 할당/결과 제출 API 사용 여부
-WORK_ALLOCATE_URL = "http://61.84.75.37:3302/api/work/allocate-screenshot"
+WORK_ALLOCATE_URL = "http://61.84.75.37:3302/api/work/allocate-screenshot?site_code=topr"
 WORK_RESULT_URL = "http://61.84.75.37:3302/api/work/screenshot-result"
 
 # 기본 상품 파라미터

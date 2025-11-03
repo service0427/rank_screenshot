@@ -212,13 +212,31 @@ except Exception as e:
             print(f"❌ 작업 할당 중 오류: {e}")
             return None
 
-    def submit_result(self, work_id: int, screenshot_url: str) -> bool:
+    def submit_result(
+        self,
+        work_id: int,
+        screenshot_url: str,
+        keyword: str = None,
+        rank: int = None,
+        product_id: str = None,
+        item_id: str = None,
+        vendor_item_id: str = None,
+        match_condition: str = None,
+        filename: str = None
+    ) -> bool:
         """
         작업 결과 제출
 
         Args:
             work_id: 작업 ID
             screenshot_url: 업로드된 스크린샷 URL
+            keyword: 검색 키워드
+            rank: 발견된 순위 (전체 누적 순위)
+            product_id: 상품 ID
+            item_id: 아이템 ID
+            vendor_item_id: 판매자 아이템 ID
+            match_condition: 매칭 조건 (예: "product_id 일치", "완전 일치")
+            filename: 스크린샷 파일명
 
         Returns:
             성공 여부
@@ -227,10 +245,21 @@ except Exception as e:
             print(f"\n📤 작업 결과 제출:")
             print(f"   - 작업 ID: {work_id}")
             print(f"   - 스크린샷 URL: {screenshot_url}")
+            if rank:
+                print(f"   - 순위: {rank}위")
+            if match_condition:
+                print(f"   - 매칭 조건: {match_condition}")
 
             payload = {
                 "id": work_id,
-                "screenshot_url": screenshot_url
+                "screenshot_url": screenshot_url,
+                "keyword": keyword,
+                "rank": rank,
+                "product_id": product_id,
+                "item_id": item_id,
+                "vendor_item_id": vendor_item_id,
+                "match_condition": match_condition,
+                "filename": filename
             }
 
             # 요청 시작 시간 측정

@@ -314,9 +314,30 @@ def run_agent_selenium_uc(
                 else:
                     screenshot_url = "PRODUCT_NOT_FOUND"
 
+                # 파일명 추출 (URL에서 파일명만)
+                from pathlib import Path
+                filename = Path(screenshot_url).name if screenshot_url and screenshot_url != "PRODUCT_NOT_FOUND" else None
+
+                # 순위 정보 추출
+                rank = None
+                if result.success and hasattr(result, 'matched_product') and result.matched_product:
+                    rank = result.matched_product.get('rank')
+
+                # 매칭 조건 추출
+                match_condition = None
+                if result.success and hasattr(result, 'match_condition'):
+                    match_condition = result.match_condition
+
                 submit_success = api_client.submit_result(
                     work_id=work_id,
-                    screenshot_url=screenshot_url
+                    screenshot_url=screenshot_url,
+                    keyword=keyword,
+                    rank=rank,
+                    product_id=product_id,
+                    item_id=item_id,
+                    vendor_item_id=vendor_item_id,
+                    match_condition=match_condition,
+                    filename=filename
                 )
 
                 if submit_success:

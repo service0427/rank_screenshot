@@ -64,23 +64,7 @@ else
 fi
 
 # ===================================================================
-# 3. Screenshots 디렉토리 권한 설정
-# ===================================================================
-
-log_info "Setting screenshots directory permissions..."
-
-SCREENSHOTS_DIR="$SCRIPT_DIR/screenshots"
-if [ -d "$SCREENSHOTS_DIR" ]; then
-    chmod -R o+rwX "$SCREENSHOTS_DIR" 2>/dev/null || log_warn "Could not set full permissions on $SCREENSHOTS_DIR"
-    log_success "Screenshots directory writable by VPN users"
-else
-    mkdir -p "$SCREENSHOTS_DIR"
-    chmod o+rwx "$SCREENSHOTS_DIR"
-    log_success "Screenshots directory created"
-fi
-
-# ===================================================================
-# 4. Undetected ChromeDriver 디렉토리 권한 설정
+# 3. Undetected ChromeDriver 디렉토리 권한 설정
 # ===================================================================
 
 log_info "Setting undetected_chromedriver directory permissions..."
@@ -96,7 +80,7 @@ else
 fi
 
 # ===================================================================
-# 5. Selenium 캐시 디렉토리 권한 설정
+# 4. Selenium 캐시 디렉토리 권한 설정
 # ===================================================================
 
 log_info "Setting selenium cache directory permissions..."
@@ -112,7 +96,7 @@ else
 fi
 
 # ===================================================================
-# 6. VPN 사용자 확인
+# 5. VPN 사용자 확인
 # ===================================================================
 
 log_info "Checking VPN users..."
@@ -126,7 +110,7 @@ else
 fi
 
 # ===================================================================
-# 7. ChromeDriver 디렉토리 권한 (있는 경우)
+# 6. ChromeDriver 디렉토리 권한 (있는 경우)
 # ===================================================================
 
 CHROMEDRIVER_DIR="$SCRIPT_DIR/chromedriver"
@@ -137,7 +121,7 @@ if [ -d "$CHROMEDRIVER_DIR" ]; then
 fi
 
 # ===================================================================
-# 8. Python site-packages 확인
+# 7. Python site-packages 확인
 # ===================================================================
 
 log_info "Checking Python packages accessibility..."

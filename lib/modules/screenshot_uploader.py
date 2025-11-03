@@ -111,9 +111,13 @@ class ScreenshotUploader:
 
                     # POST 데이터 로그 출력
                     import json
-                    print(f"   📋 전송 데이터:")
-                    print(f"      파일: {filepath.name}")
-                    print(f"      데이터: {json.dumps(data, ensure_ascii=False, indent=2)}")
+                    print(f"   📋 전송 데이터 (multipart/form-data):")
+                    print(f"      📎 파일 필드: image")
+                    print(f"         - 파일명: {filepath.name}")
+                    print(f"         - 타입: image/png")
+                    print(f"         - 크기: {file_size / 1024:.2f} KB")
+                    print(f"      📝 데이터 필드:")
+                    print(f"{json.dumps(data, ensure_ascii=False, indent=8)}")
 
                     # POST 요청
                     response = requests.post(

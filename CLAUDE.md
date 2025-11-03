@@ -73,8 +73,8 @@ python3 agent.py --version 134 --close
 개별 컴포넌트를 직접 설치하려면:
 
 ```bash
-# Python 패키지
-pip3 install --user -r requirements.txt
+# Python 패키지 (시스템 전역 설치 - VPN 사용 시 필요)
+sudo pip3 install -r requirements.txt
 
 # Chrome 130, 144 자동 설치
 ./install-chrome-versions.sh

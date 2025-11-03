@@ -131,7 +131,8 @@ echo ""
 
 if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
     log_info "requirements.txt에서 패키지 설치 중..."
-    pip3 install --user -r "$SCRIPT_DIR/requirements.txt"
+    log_warn "시스템 전역 설치 (VPN 사용 시 필요)"
+    sudo pip3 install -r "$SCRIPT_DIR/requirements.txt"
     log_success "Python 패키지 설치 완료"
 else
     log_error "requirements.txt not found!"

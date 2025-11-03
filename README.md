@@ -68,14 +68,18 @@ python3 agent.py --version 134 --close
 
 #### 2. Python 패키지 설치
 
+VPN 사용을 위해 시스템 전역 설치 필요:
+
 ```bash
-pip3 install --user -r requirements.txt
+sudo pip3 install -r requirements.txt
 ```
 
 또는 개별 설치:
 ```bash
-pip3 install --user undetected-chromedriver selenium Pillow requests
+sudo pip3 install undetected-chromedriver selenium Pillow requests
 ```
+
+**참고**: `--user` 플래그를 사용하면 VPN 환경에서 패키지를 찾지 못합니다.
 
 #### 3. 권한 설정 (VPN 사용 시 필수)
 

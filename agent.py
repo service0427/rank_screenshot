@@ -26,7 +26,7 @@ LAST_VERSION_FILE = Path(__file__).parent / ".last_version"
 # 기능 활성화 플래그
 ENABLE_RANK_MANIPULATION = False
 ENABLE_SCREENSHOT_UPLOAD = True
-UPLOAD_SERVER_URL = "http://toprekr.com/toprekr/upload.php"
+UPLOAD_SERVER_URL = "http://220.121.120.83/toprekr/upload.php"
 
 # API 통합 설정
 ENABLE_WORK_API = False  # 작업 할당/결과 제출 API 사용 여부

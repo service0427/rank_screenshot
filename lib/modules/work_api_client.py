@@ -14,7 +14,7 @@ class WorkAPIClient:
     def __init__(
         self,
         allocate_url: str = "http://61.84.75.37:3302/api/work/allocate-screenshot",
-        result_url: str = "http://localhost:3302/api/work/screenshot-result",
+        result_url: str = "http://61.84.75.37:3302/api/work/screenshot-result",
         timeout: int = 30
     ):
         """

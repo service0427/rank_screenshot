@@ -195,8 +195,12 @@ def run_agent_selenium_uc(
                 else:
                     print(f"   📍 Local IP: {ip_address}")
 
-                print("\n⏸️  Press Enter to continue...")
-                input()
+                if not close_after:
+                    print("\n⏸️  Press Enter to continue...")
+                    input()
+                else:
+                    print("   ✅ IP 확인 완료 (자동 진행)")
+                    time.sleep(1)
             except Exception as e:
                 print(f"   ⚠️  IP 확인 실패: {e}")
 
@@ -205,8 +209,12 @@ def run_agent_selenium_uc(
             print("\n" + "=" * 60)
             print("🧪 Detection Test Mode")
             print("=" * 60)
-            print("\n⏸️  Press Enter to continue after manual inspection...")
-            input()
+            if not close_after:
+                print("\n⏸️  Press Enter to continue after manual inspection...")
+                input()
+            else:
+                print("   ✅ 탐지 테스트 모드 (자동 진행)")
+                time.sleep(3)
 
         # === 4. 모듈 초기화 ===
         handler = CoupangHandlerSelenium(driver)
@@ -348,6 +356,7 @@ def run_work_api_mode(
     instance_id: int = 1,
     version: str = None,
     close_after: bool = True,
+    check_ip: bool = False,
     window_width: int = 1300,
     window_height: int = 1200,
     window_x: int = 10,
@@ -427,6 +436,7 @@ def run_work_api_mode(
         close_after=close_after,
         work_id=work_id,
         api_client=api_client,
+        check_ip=check_ip,
         window_width=window_width,
         window_height=window_height,
         window_x=calc_x,
@@ -682,35 +692,6 @@ def main():
             return
         print("=" * 60 + "\n")
 
-    # === 작업 API 모드 ===
-    if args.work_api or ENABLE_WORK_API:
-        print("\n🔄 작업 API 모드 활성화")
-
-        # work_api 값 파싱 (True면 자동 할당, 숫자면 해당 ID 지정)
-        specified_work_id = None
-        if args.work_api is not True:
-            try:
-                specified_work_id = int(args.work_api)
-                print(f"   📌 지정된 작업 ID: {specified_work_id}")
-            except (ValueError, TypeError):
-                print(f"   ⚠️  잘못된 work ID 형식: {args.work_api}, 자동 할당으로 진행")
-
-        success = run_work_api_mode(
-            instance_id=args.instance,
-            version=args.version,
-            close_after=args.close,
-            window_width=args.window_width,
-            window_height=args.window_height,
-            window_x=args.window_x,
-            window_y=args.window_y,
-            highlight_preset=args.highlight,
-            enable_rank_edit=args.edit or args.edit2,
-            edit_mode="edit2" if args.edit2 else ("edit" if args.edit else None),
-            enable_main_filter=args.enable_main_filter,
-            specified_work_id=specified_work_id
-        )
-        sys.exit(0 if success else 1)
-
     # === VPN 재실행 로직 ===
     if args.vpn is not None:
         if not os.environ.get('VPN_EXECUTED'):
@@ -746,6 +727,36 @@ def main():
             cmd = [vpn_cmd, str(args.vpn), 'python3'] + new_args
             os.execvpe(vpn_cmd, cmd, env)
             return
+    # === 작업 API 모드 ===
+    if args.work_api or ENABLE_WORK_API:
+        print("\n🔄 작업 API 모드 활성화")
+
+        # work_api 값 파싱 (True면 자동 할당, 숫자면 해당 ID 지정)
+        specified_work_id = None
+        if args.work_api is not True:
+            try:
+                specified_work_id = int(args.work_api)
+                print(f"   📌 지정된 작업 ID: {specified_work_id}")
+            except (ValueError, TypeError):
+                print(f"   ⚠️  잘못된 work ID 형식: {args.work_api}, 자동 할당으로 진행")
+
+        success = run_work_api_mode(
+            instance_id=args.instance,
+            version=args.version,
+            close_after=args.close,
+            check_ip=args.ip_check,
+            window_width=args.window_width,
+            window_height=args.window_height,
+            window_x=args.window_x,
+            window_y=args.window_y,
+            highlight_preset=args.highlight,
+            enable_rank_edit=args.edit or args.edit2,
+            edit_mode="edit2" if args.edit2 else ("edit" if args.edit else None),
+            enable_main_filter=args.enable_main_filter,
+            specified_work_id=specified_work_id
+        )
+        sys.exit(0 if success else 1)
+
 
     # === 인터랙티브 모드 ===
     if args.interactive:

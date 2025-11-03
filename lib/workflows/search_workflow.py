@@ -219,9 +219,13 @@ class SearchWorkflow:
                 # 검색 결과 로딩 완료 대기
                 self._wait_for_page_load()
 
+                # http2 protocol error 체크
+                if self._check_http2_error():
+                    result.error_message = "http2 protocol error 발생 (IP 차단 또는 네트워크 오류)"
+                    return result
+
             # 3. 에러 체크
             print("\n🔍 Checking for errors...\n")
-            # (에러 체크 로직은 handler에서 처리)
 
             # 4. 상품 목록 추출
             print("\n" + "=" * 60)
@@ -339,6 +343,11 @@ class SearchWorkflow:
                 # 다음 페이지 로딩 대기
                 self._wait_for_page_load()
 
+                # http2 protocol error 체크
+                if self._check_http2_error():
+                    result.error_message = "http2 protocol error 발생 (IP 차단 또는 네트워크 오류)"
+                    return result
+
                 # 새 페이지에서 상품 목록 다시 추출
                 structure = self.finder.analyze_product_list_structure()
                 organic_products = structure["organic_products"]
@@ -443,6 +452,11 @@ class SearchWorkflow:
 
                     # 페이지 로딩 대기
                     self._wait_for_page_load()
+
+                    # http2 protocol error 체크
+                    if self._check_http2_error():
+                        result.error_message = "http2 protocol error 발생 (IP 차단 또는 네트워크 오류)"
+                        return result
 
                     # 목표 페이지에서 상품 목록 다시 추출
                     structure = self.finder.analyze_product_list_structure()
@@ -810,6 +824,28 @@ class SearchWorkflow:
             traceback.print_exc()
             result.error_message = str(e)
             return result
+
+    def _check_http2_error(self) -> bool:
+        """
+        http2 protocol error 감지
+
+        Returns:
+            에러 발생 시 True, 정상이면 False
+        """
+        try:
+            current_url = self.driver.current_url.lower()
+
+            # http2_protocol_error 또는 차단 페이지 감지
+            if 'http2_protocol_error' in current_url or 'err_http2_protocol_error' in current_url:
+                print("\n🚫 http2 protocol error 감지!")
+                print(f"   URL: {self.driver.current_url}")
+                return True
+
+            return False
+
+        except Exception as e:
+            print(f"⚠️  URL 확인 실패: {e}")
+            return False
 
     def _wait_for_page_load(self, timeout: int = 10) -> bool:
         """

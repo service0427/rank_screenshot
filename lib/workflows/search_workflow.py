@@ -22,6 +22,7 @@ from lib.modules.rank_manipulator import RankManipulator
 from lib.modules.rank.rank_swapper import RankSwapper
 from lib.modules.product_page_visitor import ProductPageVisitor
 from lib.modules.pagination_handler import PaginationHandler
+from lib.modules.rank.watermark_display import WatermarkDisplay
 
 
 class SearchWorkflowResult:
@@ -100,6 +101,9 @@ class SearchWorkflow:
 
         # 페이지네이션 핸들러 초기화
         self.pagination = PaginationHandler(driver)
+
+        # 워터마크 표시 모듈 초기화 (정상 검색용)
+        self.watermark_display = WatermarkDisplay(driver)
 
     def execute(
         self,
@@ -815,6 +819,40 @@ class SearchWorkflow:
                 # 스크롤 및 안정화
                 self.finder.scroll_to_center(product_info)
                 self._wait_for_page_load()
+
+                # 워터마크 표시 (11등 이상의 상품에만)
+                try:
+                    # 현재 페이지의 모든 상품 조회
+                    all_items = self.driver.find_elements("css selector", "#product-list > li[data-id]")
+                    if not all_items:
+                        all_items = self.driver.find_elements("css selector", "#product-list > li")
+
+                    # 각 상품의 광고 여부 및 순위 정보 수집
+                    items_info = []
+                    for idx, item in enumerate(all_items):
+                        is_ad = self.finder._is_ad_element(item)
+                        items_info.append({
+                            "is_ad": is_ad,
+                            "dom_index": idx,
+                            "rank": idx + 1 if not is_ad else None  # 임시 순위
+                        })
+
+                    # rank_offset 계산 (이전 페이지의 일반 상품 개수)
+                    current_page = result.found_on_page if result.found_on_page else 1
+                    rank_offset = (current_page - 1) * 40  # 페이지당 최대 40개 상품
+
+                    # 워터마크 표시
+                    self.watermark_display.display_watermarks_for_page(
+                        all_items=all_items,
+                        items_info=items_info,
+                        rank_offset=rank_offset
+                    )
+
+                    # 워터마크 표시 후 안정화
+                    time.sleep(0.3)
+
+                except Exception as e:
+                    print(f"⚠️  워터마크 표시 중 오류 (계속 진행): {e}")
 
                 # "after" 스크린샷 (하이라이트 적용된 상태)
                 result.after_screenshot, result.after_screenshot_url = self.screenshot_processor.capture_with_overlay(

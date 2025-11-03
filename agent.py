@@ -834,7 +834,14 @@ Examples:
                 new_args.append(arg)
 
             # VPN_EXECUTED 환경 변수를 명시적으로 전달 (sudo -u 전환 시에도 유지)
-            cmd = [vpn_cmd, str(args.vpn), 'env', f'VPN_EXECUTED={args.vpn}', 'python3'] + new_args
+            # XDG 환경 변수로 ChromeDriver 캐시를 agent 소유자의 홈 디렉토리로 설정
+            # → VPN 사용자가 agent 소유자의 ChromeDriver 캐시를 공유 (중복 다운로드 방지)
+            current_user_home = os.path.expanduser('~')
+            cmd = [vpn_cmd, str(args.vpn), 'env',
+                   f'VPN_EXECUTED={args.vpn}',
+                   f'XDG_CACHE_HOME={current_user_home}/.cache',
+                   f'XDG_DATA_HOME={current_user_home}/.local/share',
+                   'python3'] + new_args
             os.execvpe(vpn_cmd, cmd, os.environ.copy())
             return
     # === 작업 API 모드 ===

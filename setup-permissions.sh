@@ -128,7 +128,26 @@ else
 fi
 
 # ===================================================================
-# 6. ChromeDriver 디렉토리 권한 (있는 경우)
+# 6. Chrome 바이너리 실행 권한 설정
+# ===================================================================
+
+log_info "Setting Chrome binary execute permissions..."
+
+CHROME_VERSION_DIR="$SCRIPT_DIR/chrome-version"
+if [ -d "$CHROME_VERSION_DIR" ]; then
+    # chrome-version/*/chrome-linux64/chrome 파일에 실행 권한 부여
+    find "$CHROME_VERSION_DIR" -type f -name "chrome" -path "*/chrome-linux64/chrome" -exec chmod 755 {} \; 2>/dev/null || log_warn "Could not set execute permissions on Chrome binaries"
+
+    # 모든 파일을 읽을 수 있도록 설정 (VPN 사용자가 Chrome 실행 시 필요한 라이브러리 접근)
+    chmod -R o+rX "$CHROME_VERSION_DIR" 2>/dev/null || log_warn "Could not set read permissions on chrome-version directory"
+
+    log_success "Chrome binaries executable by all users"
+else
+    log_warn "chrome-version directory not found at $CHROME_VERSION_DIR"
+fi
+
+# ===================================================================
+# 7. ChromeDriver 디렉토리 권한 (있는 경우)
 # ===================================================================
 
 CHROMEDRIVER_DIR="$SCRIPT_DIR/chromedriver"
@@ -139,7 +158,7 @@ if [ -d "$CHROMEDRIVER_DIR" ]; then
 fi
 
 # ===================================================================
-# 7. Python site-packages 확인
+# 8. Python site-packages 확인
 # ===================================================================
 
 log_info "Checking Python packages accessibility..."

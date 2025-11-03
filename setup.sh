@@ -90,6 +90,7 @@ sudo apt-get install -y \
     wget \
     curl \
     unzip \
+    jq \
     xvfb \
     libglib2.0-0 \
     libnss3 \

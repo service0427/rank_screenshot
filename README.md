@@ -19,9 +19,52 @@ Selenium + undetected-chromedriver를 사용한 쿠팡 자동화 탐지 테스�
 
 ## 📦 설치
 
-### 1. Chrome 버전 설치
+### ⚡ 자동 설치 (권장)
 
-#### Stable 버전 (127~144)
+**우분투 22.04 LTS에서 한 번에 모든 의존성 설치:**
+
+```bash
+# 저장소 클론
+git clone https://github.com/service0427/rank_screenshot.git
+cd rank_screenshot
+
+# 자동 설치 스크립트 실행
+./setup.sh
+```
+
+**설치되는 항목:**
+- ✅ Python 3.10+ 및 pip
+- ✅ 필수 시스템 라이브러리 (Chrome 실행용)
+- ✅ Python 패키지 (undetected-chromedriver, selenium, Pillow, requests)
+- ✅ Chrome 130 (구버전 TLS 대표)
+- ✅ Chrome 144 (최신 버전)
+- ✅ 디렉토리 구조 생성
+- ✅ 권한 설정
+
+**설치 후 바로 테스트:**
+```bash
+python3 agent.py --version 134 --close
+```
+
+---
+
+### 🔧 수동 설치 (선택사항)
+
+<details>
+<summary>수동 설치 가이드 보기 (클릭)</summary>
+
+#### 1. Chrome 버전 설치
+
+##### 권장 버전 (TLS 다양성)
+```bash
+# 구버전 TLS (127-130 대표)
+./install-chrome-versions.sh 130
+
+# 최신 버전 (131+ 대표)
+./install-chrome-versions.sh 144
+```
+
+##### Stable 버전 (127~144)
 ```bash
 # 모든 Stable 버전 설치
 ./install-chrome-versions.sh all
@@ -30,7 +73,7 @@ Selenium + undetected-chromedriver를 사용한 쿠팡 자동화 탐지 테스�
 ./install-chrome-versions.sh 134
 ```
 
-#### Chrome 채널 (Beta/Dev/Canary)
+##### Chrome 채널 (Beta/Dev/Canary)
 ```bash
 # 모든 채널 설치 (Beta, Dev, Canary)
 ./install-chrome-versions.sh channels
@@ -50,13 +93,18 @@ Selenium + undetected-chromedriver를 사용한 쿠팡 자동화 탐지 테스�
 - **Canary**: 최첨단 빌드, 매일 업데이트
 - **빌드 번호 다양성**: Stable 143과 Beta 143은 빌드 번호가 다름 (143.0.6948.x vs 143.0.7499.x)
 
-### 2. Python 패키지 설치
+#### 2. Python 패키지 설치
 
 ```bash
-pip install undetected-chromedriver selenium
+pip3 install --user -r requirements.txt
 ```
 
-### 3. 권한 설정 (VPN 사용 시 필수)
+또는 개별 설치:
+```bash
+pip3 install --user undetected-chromedriver selenium Pillow requests
+```
+
+#### 3. 권한 설정 (VPN 사용 시 필수)
 
 VPN과 함께 사용하는 경우 권한 설정이 필요합니다:
 
@@ -75,6 +123,8 @@ VPN과 함께 사용하는 경우 권한 설정이 필요합니다:
 - 서버 환경마다 경로가 다를 수 있음
 - VPN 클라이언트 설치 후 실행 권장
 - 권한 오류 발생 시 재실행
+
+</details>
 
 ## 🚀 사용법
 

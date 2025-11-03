@@ -1,0 +1,12 @@
+# Coupang Agent V2 Dependencies
+# Python 3.10+ required
+
+# Browser automation
+undetected-chromedriver>=3.5.5
+selenium>=4.15.0
+
+# Image processing
+Pillow>=10.0.0
+
+# HTTP client
+requests>=2.31.0

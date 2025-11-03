@@ -39,9 +39,54 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Coupang Agent V2는 Selenium + undetected-chromedriver를 사용한 자동화 탐지 우회 도구입니다. Chrome 130 (구버전 TLS) 및 144 (최신 버전)를 사용하여 TLS 핑거프린팅 다양성을 확보하고, VPN 통합으로 IP 우회 기능을 제공합니다.
 
+## 설치
+
+### 자동 설치 (권장)
+
+우분투 22.04 LTS에서 한 번에 모든 의존성을 설치합니다:
+
+```bash
+# 저장소 클론
+git clone https://github.com/service0427/rank_screenshot.git
+cd rank_screenshot
+
+# 자동 설치 스크립트 실행
+./setup.sh
+```
+
+**설치 항목:**
+- Python 3.10+ 및 pip
+- 필수 시스템 라이브러리 (Chrome 실행용)
+- Python 패키지 (undetected-chromedriver, selenium, Pillow, requests)
+- Chrome 130 (구버전 TLS 대표)
+- Chrome 144 (최신 버전)
+- 디렉토리 구조 생성
+- 권한 설정
+
+**설치 후 테스트:**
+```bash
+python3 agent.py --version 134 --close
+```
+
+### 수동 설치
+
+개별 컴포넌트를 직접 설치하려면:
+
+```bash
+# Python 패키지
+pip3 install --user -r requirements.txt
+
+# Chrome 버전
+./install-chrome-versions.sh 130
+./install-chrome-versions.sh 144
+
+# 권한 설정
+./setup-permissions.sh
+```
+
 ## 핵심 실행 명령어
 
-### Chrome 버전 설치
+### Chrome 버전 관리
 ```bash
 # 권장 버전 설치
 ./install-chrome-versions.sh 130  # 구버전 TLS (127-130 대표)

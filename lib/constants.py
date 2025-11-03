@@ -183,3 +183,17 @@ class Config:
 
     # Browser Profiles
     PROFILE_DIR_BASE = "/home/tech/agent/browser-profiles"
+
+    # Watermark Settings (11+ rank display)
+    WATERMARK_POSITION_TOP = "10px"
+    WATERMARK_POSITION_RIGHT = "10px"  # 오른쪽 상단
+    WATERMARK_BG_COLOR = "#FF6B00"  # 쿠팡 오렌지색
+    WATERMARK_TEXT_COLOR = "white"
+    WATERMARK_PADDING = "4px 8px"
+    WATERMARK_FONT_SIZE = "12px"
+    WATERMARK_FONT_WEIGHT = "bold"
+    WATERMARK_BORDER_RADIUS = "4px"
+    WATERMARK_Z_INDEX = "10"
+    WATERMARK_FONT_FAMILY = "Arial, sans-serif"
+    WATERMARK_LINE_HEIGHT = "1"
+    WATERMARK_MIN_RANK = 11  # 11등부터 워터마크 표시

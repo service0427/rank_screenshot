@@ -6,6 +6,7 @@
 
 from typing import List, Dict
 from selenium.webdriver.remote.webelement import WebElement
+from lib.constants import Config
 
 
 class WatermarkDisplay:
@@ -55,10 +56,10 @@ class WatermarkDisplay:
             if organics:
                 print(f"   순위 범위: {organic_ranks[0]}~{organic_ranks[-1]}등")
 
-            # 11등 이상의 상품에만 워터마크 추가
+            # MIN_RANK 이상의 상품에만 워터마크 추가
             watermark_count = 0
             for item, rank in zip(organics, organic_ranks):
-                if rank > 10:  # 11등부터
+                if rank >= Config.WATERMARK_MIN_RANK:  # 전역 설정 사용
                     success = self._add_watermark(item, rank)
                     if success:
                         watermark_count += 1
@@ -88,44 +89,45 @@ class WatermarkDisplay:
             성공 여부
         """
         try:
-            # 쿠팡과 동일한 디자인으로 워터마크 생성
-            self.driver.execute_script("""
+            # 전역 설정을 사용하여 워터마크 생성
+            script = f"""
                 var rank = arguments[1];
 
                 // 워터마크 컨테이너 찾기
                 var container = arguments[0].querySelector('.search-product');
-                if (!container) {
+                if (!container) {{
                     container = arguments[0];
-                }
+                }}
 
                 // 워터마크 요소 생성
                 var mark = document.createElement('span');
                 mark.className = 'RankMark_rank' + rank + '__custom';
                 mark.textContent = rank;
 
-                // 쿠팡 스타일과 동일하게 설정
+                // 전역 설정 기반 스타일 적용
                 mark.style.position = 'absolute';
-                mark.style.top = '10px';
-                mark.style.right = '10px';  // 오른쪽 상단으로 변경
-                mark.style.backgroundColor = '#FF6B00';  // 쿠팡 오렌지색
-                mark.style.color = 'white';
-                mark.style.padding = '4px 8px';
-                mark.style.fontSize = '12px';
-                mark.style.fontWeight = 'bold';
-                mark.style.borderRadius = '4px';
-                mark.style.zIndex = '10';
-                mark.style.fontFamily = 'Arial, sans-serif';
-                mark.style.lineHeight = '1';
+                mark.style.top = '{Config.WATERMARK_POSITION_TOP}';
+                mark.style.right = '{Config.WATERMARK_POSITION_RIGHT}';
+                mark.style.backgroundColor = '{Config.WATERMARK_BG_COLOR}';
+                mark.style.color = '{Config.WATERMARK_TEXT_COLOR}';
+                mark.style.padding = '{Config.WATERMARK_PADDING}';
+                mark.style.fontSize = '{Config.WATERMARK_FONT_SIZE}';
+                mark.style.fontWeight = '{Config.WATERMARK_FONT_WEIGHT}';
+                mark.style.borderRadius = '{Config.WATERMARK_BORDER_RADIUS}';
+                mark.style.zIndex = '{Config.WATERMARK_Z_INDEX}';
+                mark.style.fontFamily = '{Config.WATERMARK_FONT_FAMILY}';
+                mark.style.lineHeight = '{Config.WATERMARK_LINE_HEIGHT}';
 
                 // 컨테이너 position 설정
                 if (container.style.position !== 'relative' &&
-                    container.style.position !== 'absolute') {
+                    container.style.position !== 'absolute') {{
                     container.style.position = 'relative';
-                }
+                }}
 
                 // 워터마크 추가
                 container.appendChild(mark);
-            """, item, rank)
+            """
+            self.driver.execute_script(script, item, rank)
 
             return True
 

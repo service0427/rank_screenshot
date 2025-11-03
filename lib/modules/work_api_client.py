@@ -127,12 +127,12 @@ except Exception as e:
             print(f"❌ 로컬 네트워크 요청 중 오류: {e}")
             return None
 
-    def allocate_work(self, work_id: int = None) -> Optional[Dict[str, Any]]:
+    def allocate_work(self, screenshot_id: int = None) -> Optional[Dict[str, Any]]:
         """
         스크린샷 작업 할당 요청
 
         Args:
-            work_id: 지정된 작업 ID (None이면 자동 할당)
+            screenshot_id: 지정된 작업 ID (None이면 자동 할당)
 
         Returns:
             성공 시 작업 정보 딕셔너리:
@@ -150,15 +150,15 @@ except Exception as e:
             실패 시 None
         """
         try:
-            # URL 구성 (work_id가 있으면 쿼리 파라미터로 추가)
+            # URL 구성 (screenshot_id가 있으면 쿼리 파라미터로 추가)
             url = self.allocate_url
             params = {}
-            if work_id is not None:
-                params['id'] = work_id
+            if screenshot_id is not None:
+                params['id'] = screenshot_id
 
             print(f"\n📥 작업 할당 요청: {url}")
-            if work_id:
-                print(f"   📌 지정 작업 ID: {work_id}")
+            if screenshot_id:
+                print(f"   📌 지정 작업 ID: {screenshot_id}")
 
             # 요청 시작 시간 측정
             start_time = time.time()
@@ -214,7 +214,7 @@ except Exception as e:
 
     def submit_result(
         self,
-        work_id: int,
+        screenshot_id: int,
         screenshot_url: str,
         keyword: str = None,
         rank: int = None,
@@ -227,7 +227,7 @@ except Exception as e:
         작업 결과 제출
 
         Args:
-            work_id: 작업 ID
+            screenshot_id: 작업 ID
             screenshot_url: 업로드된 스크린샷 URL
             keyword: 검색 키워드
             rank: 발견된 순위 (전체 누적 순위)
@@ -241,7 +241,7 @@ except Exception as e:
         """
         try:
             print(f"\n📤 작업 결과 제출:")
-            print(f"   - 작업 ID: {work_id}")
+            print(f"   - 작업 ID: {screenshot_id}")
             print(f"   - 스크린샷 URL: {screenshot_url}")
             if rank:
                 print(f"   - 순위: {rank}위")
@@ -249,7 +249,7 @@ except Exception as e:
                 print(f"   - 매칭 필드: product_id={product_id}, item_id={item_id}, vendor_item_id={vendor_item_id}")
 
             payload = {
-                "id": work_id,
+                "id": screenshot_id,
                 "screenshot_url": screenshot_url,
                 "keyword": keyword,
                 "rank": rank,

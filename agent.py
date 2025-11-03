@@ -107,7 +107,7 @@ def run_agent_selenium_uc(
     version: str = None,
     test_detection: bool = False,
     close_after: bool = False,
-    work_id: int = None,
+    screenshot_id: int = None,
     api_client: WorkAPIClient = None,
     check_ip: bool = False,
     window_width: int = 1300,
@@ -132,7 +132,7 @@ def run_agent_selenium_uc(
         version: Chrome 버전
         test_detection: 탐지 테스트 모드
         close_after: 검사 후 3초 뒤 자동 종료
-        work_id: 작업 ID (API 모드)
+        screenshot_id: 작업 ID (API 모드)
         api_client: API 클라이언트
         check_ip: IP 확인 여부
         window_width: 창 너비 (기본: 1300)
@@ -246,7 +246,7 @@ def run_agent_selenium_uc(
             vendor_item_id=vendor_item_id,
             version=version if version else "unknown",
             min_rank=min_rank,  # 최소 순위 전달
-            work_id=work_id  # 작업 ID 전달 (업로드 시 screenshot_id로 사용)
+            screenshot_id=screenshot_id  # 작업 ID 전달 (업로드 시 screenshot_id로 사용)
         )
 
         # === 6. 결과 출력 ===
@@ -288,14 +288,14 @@ def run_agent_selenium_uc(
                         print(f"   ... (총 {len(result.page_history)}개 페이지)")
 
         # === 7. API 결과 제출 (활성화된 경우) ===
-        if api_client and work_id:
+        if api_client and screenshot_id:
             # 차단된 경우 작업 결과 제출 건너뛰기
             if result.error_message and "차단" in result.error_message:
                 print("\n" + "=" * 60)
                 print("⚠️  차단 감지 - 작업 결과 제출 건너뛰기")
                 print("=" * 60)
                 print(f"   차단 사유: {result.error_message}")
-                print(f"   작업 ID {work_id}는 제출하지 않습니다\n")
+                print(f"   작업 ID {screenshot_id}는 제출하지 않습니다\n")
             else:
                 print("\n" + "=" * 60)
                 print("📤 작업 결과 제출")
@@ -351,7 +351,7 @@ def run_agent_selenium_uc(
                         api_item_id = item_id
 
                 submit_success = api_client.submit_result(
-                    work_id=work_id,
+                    screenshot_id=screenshot_id,
                     screenshot_url=screenshot_url,
                     keyword=keyword,
                     rank=rank,
@@ -362,11 +362,11 @@ def run_agent_selenium_uc(
                 )
 
                 if submit_success:
-                    print(f"✅ 작업 ID {work_id} 결과 제출 완료")
+                    print(f"✅ 작업 ID {screenshot_id} 결과 제출 완료")
                     if not result.success:
                         print(f"   📋 상태: 상품 미발견 (PRODUCT_NOT_FOUND)")
                 else:
-                    print(f"⚠️  작업 ID {work_id} 결과 제출 실패")
+                    print(f"⚠️  작업 ID {screenshot_id} 결과 제출 실패")
 
         # === 8. 대기 및 종료 ===
         wait_for_user_or_close(driver, core, close_after)
@@ -407,7 +407,7 @@ def run_work_api_mode(
     enable_rank_edit: bool = False,
     edit_mode: str = None,
     enable_main_filter: bool = False,
-    specified_work_id: int = None
+    specified_screenshot_id: int = None
 ):
     """
     작업 API 모드 실행
@@ -426,7 +426,7 @@ def run_work_api_mode(
         highlight_preset: 하이라이트 프리셋
         enable_rank_edit: 순위 조작 활성화 여부 (기본: False)
         enable_main_filter: 메인 페이지 네트워크 필터 활성화 여부 (기본: False)
-        specified_work_id: 지정된 작업 ID (None이면 자동 할당)
+        specified_screenshot_id: 지정된 작업 ID (None이면 자동 할당)
     """
     print("\n" + "=" * 60)
     print("🔄 작업 API 모드 시작")
@@ -439,9 +439,9 @@ def run_work_api_mode(
     )
 
     # 작업 할당 요청 (지정된 ID가 있으면 해당 ID로 요청)
-    if specified_work_id:
-        print(f"📌 지정된 작업 ID로 할당 요청: {specified_work_id}")
-        work_data = api_client.allocate_work(work_id=specified_work_id)
+    if specified_screenshot_id:
+        print(f"📌 지정된 작업 ID로 할당 요청: {specified_screenshot_id}")
+        work_data = api_client.allocate_work(screenshot_id=specified_screenshot_id)
     else:
         print("🔄 자동 작업 할당 요청")
         work_data = api_client.allocate_work()
@@ -451,7 +451,7 @@ def run_work_api_mode(
         return False
 
     # 작업 정보 추출
-    work_id = work_data.get("id")
+    screenshot_id = work_data.get("id")
     keyword = work_data.get("keyword")
     product_id = work_data.get("product_id")
     item_id = work_data.get("item_id")
@@ -476,7 +476,7 @@ def run_work_api_mode(
         version=version,
         test_detection=False,
         close_after=close_after,
-        work_id=work_id,
+        screenshot_id=screenshot_id,
         api_client=api_client,
         check_ip=check_ip,
         window_width=window_width,
@@ -774,11 +774,11 @@ def main():
         print("\n🔄 작업 API 모드 활성화")
 
         # work_api 값 파싱 (True면 자동 할당, 숫자면 해당 ID 지정)
-        specified_work_id = None
+        specified_screenshot_id = None
         if args.work_api is not True:
             try:
-                specified_work_id = int(args.work_api)
-                print(f"   📌 지정된 작업 ID: {specified_work_id}")
+                specified_screenshot_id = int(args.work_api)
+                print(f"   📌 지정된 작업 ID: {specified_screenshot_id}")
             except (ValueError, TypeError):
                 print(f"   ⚠️  잘못된 work ID 형식: {args.work_api}, 자동 할당으로 진행")
 
@@ -795,7 +795,7 @@ def main():
             enable_rank_edit=args.edit or args.edit2,
             edit_mode="edit2" if args.edit2 else ("edit" if args.edit else None),
             enable_main_filter=args.enable_main_filter,
-            specified_work_id=specified_work_id
+            specified_screenshot_id=specified_screenshot_id
         )
         sys.exit(0 if success else 1)
 

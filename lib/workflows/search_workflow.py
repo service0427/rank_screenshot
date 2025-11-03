@@ -219,9 +219,13 @@ class SearchWorkflow:
                 # 검색 결과 로딩 완료 대기
                 self._wait_for_page_load()
 
-                # http2 protocol error 체크
+                # 현재 URL 출력 (디버깅)
+                current_url = self.driver.current_url
+                print(f"   🔗 현재 URL: {current_url}\n")
+
+                # http2 protocol error 체크 (네트워크 오류 → 차단으로 처리)
                 if self._check_http2_error():
-                    result.error_message = "http2 protocol error 발생 (IP 차단 또는 네트워크 오류)"
+                    result.error_message = "검색 결과 차단됨 (네트워크 오류 - http2 protocol error)"
                     return result
 
             # 3. 에러 체크
@@ -236,7 +240,19 @@ class SearchWorkflow:
             organic_products = structure["organic_products"]
 
             if not organic_products:
-                result.error_message = "검색 결과 없음"
+                # 상품이 없을 때 차단 여부 확인
+                try:
+                    page_source = self.driver.page_source.lower()
+                    # 차단 관련 메시지 확인
+                    if any(keyword in page_source for keyword in ['rate limit', 'blocked', 'access denied', 'captcha', '일시적으로 차단', 'too many requests']):
+                        result.error_message = "검색 결과 차단됨 (IP 제한 또는 봇 감지)"
+                        print(f"\n🚫 차단 감지: 페이지 소스에서 차단 키워드 발견")
+                    else:
+                        result.error_message = "검색 결과 없음 (빈 페이지)"
+                        print(f"\n⚠️  검색 결과 없음: 상품이 0개입니다")
+                except:
+                    result.error_message = "검색 결과 없음"
+
                 return result
 
             # 5. 파라미터 기반 상품 매칭 (다중 페이지 탐색)
@@ -343,9 +359,9 @@ class SearchWorkflow:
                 # 다음 페이지 로딩 대기
                 self._wait_for_page_load()
 
-                # http2 protocol error 체크
+                # http2 protocol error 체크 (네트워크 오류 → 차단으로 처리)
                 if self._check_http2_error():
-                    result.error_message = "http2 protocol error 발생 (IP 차단 또는 네트워크 오류)"
+                    result.error_message = "검색 결과 차단됨 (네트워크 오류 - http2 protocol error)"
                     return result
 
                 # 새 페이지에서 상품 목록 다시 추출
@@ -453,9 +469,9 @@ class SearchWorkflow:
                     # 페이지 로딩 대기
                     self._wait_for_page_load()
 
-                    # http2 protocol error 체크
+                    # http2 protocol error 체크 (네트워크 오류 → 차단으로 처리)
                     if self._check_http2_error():
-                        result.error_message = "http2 protocol error 발생 (IP 차단 또는 네트워크 오류)"
+                        result.error_message = "검색 결과 차단됨 (네트워크 오류 - http2 protocol error)"
                         return result
 
                     # 목표 페이지에서 상품 목록 다시 추출
@@ -836,10 +852,24 @@ class SearchWorkflow:
             current_url = self.driver.current_url.lower()
 
             # http2_protocol_error 또는 차단 페이지 감지
-            if 'http2_protocol_error' in current_url or 'err_http2_protocol_error' in current_url:
+            if 'http2_protocol_error' in current_url or 'err_http2_protocol_error' in current_url or 'chrome-error://' in current_url:
                 print("\n🚫 http2 protocol error 감지!")
                 print(f"   URL: {self.driver.current_url}")
                 return True
+
+            # 페이지 타이틀에서도 에러 감지
+            try:
+                page_title = self.driver.title.lower()
+                if 'error' in page_title or '오류' in page_title:
+                    # body 텍스트 확인
+                    body_text = self.driver.find_element(By.TAG_NAME, 'body').text.lower()
+                    if 'http2' in body_text or 'protocol' in body_text or 'err_' in body_text:
+                        print("\n🚫 http2 protocol error 감지! (페이지 내용 기반)")
+                        print(f"   Title: {self.driver.title}")
+                        print(f"   URL: {self.driver.current_url}")
+                        return True
+            except:
+                pass
 
             return False
 

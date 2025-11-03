@@ -280,35 +280,43 @@ def run_agent_selenium_uc(
 
         # === 7. API 결과 제출 (활성화된 경우) ===
         if api_client and work_id:
-            print("\n" + "=" * 60)
-            print("📤 작업 결과 제출")
-            print("=" * 60 + "\n")
+            # 차단된 경우 작업 결과 제출 건너뛰기
+            if result.error_message and "차단" in result.error_message:
+                print("\n" + "=" * 60)
+                print("⚠️  차단 감지 - 작업 결과 제출 건너뛰기")
+                print("=" * 60)
+                print(f"   차단 사유: {result.error_message}")
+                print(f"   작업 ID {work_id}는 제출하지 않습니다\n")
+            else:
+                print("\n" + "=" * 60)
+                print("📤 작업 결과 제출")
+                print("=" * 60 + "\n")
 
-            # 성공 시: 스크린샷 URL 선택, 실패 시: "PRODUCT_NOT_FOUND"
-            if result.success:
-                # Edit 모드에서 after 스크린샷이 있으면 after 사용, 아니면 before 사용
-                if result.after_screenshot_url:
-                    screenshot_url = result.after_screenshot_url
-                    print(f"📤 스크린샷 URL: {screenshot_url}")
-                    print(f"   타입: 순위 조작 후 (after)")
+                # 성공 시: 스크린샷 URL 선택, 실패 시: "PRODUCT_NOT_FOUND"
+                if result.success:
+                    # Edit 모드에서 after 스크린샷이 있으면 after 사용, 아니면 before 사용
+                    if result.after_screenshot_url:
+                        screenshot_url = result.after_screenshot_url
+                        print(f"📤 스크린샷 URL: {screenshot_url}")
+                        print(f"   타입: 순위 조작 후 (after)")
+                    else:
+                        screenshot_url = result.before_screenshot_url
+                        print(f"📤 스크린샷 URL: {screenshot_url}")
+                        print(f"   타입: 순위 조작 없음 (before)")
                 else:
-                    screenshot_url = result.before_screenshot_url
-                    print(f"📤 스크린샷 URL: {screenshot_url}")
-                    print(f"   타입: 순위 조작 없음 (before)")
-            else:
-                screenshot_url = "PRODUCT_NOT_FOUND"
+                    screenshot_url = "PRODUCT_NOT_FOUND"
 
-            submit_success = api_client.submit_result(
-                work_id=work_id,
-                screenshot_url=screenshot_url
-            )
+                submit_success = api_client.submit_result(
+                    work_id=work_id,
+                    screenshot_url=screenshot_url
+                )
 
-            if submit_success:
-                print(f"✅ 작업 ID {work_id} 결과 제출 완료")
-                if not result.success:
-                    print(f"   📋 상태: 상품 미발견 (PRODUCT_NOT_FOUND)")
-            else:
-                print(f"⚠️  작업 ID {work_id} 결과 제출 실패")
+                if submit_success:
+                    print(f"✅ 작업 ID {work_id} 결과 제출 완료")
+                    if not result.success:
+                        print(f"   📋 상태: 상품 미발견 (PRODUCT_NOT_FOUND)")
+                else:
+                    print(f"⚠️  작업 ID {work_id} 결과 제출 실패")
 
         # === 8. 대기 및 종료 ===
         wait_for_user_or_close(driver, core, close_after)

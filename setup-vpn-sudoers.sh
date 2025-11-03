@@ -83,10 +83,85 @@ echo ""
 log_info "설정 내용:"
 cat "$SUDOERS_FILE"
 
+# ===================================================================
+# API 서버 IP를 VPN 라우팅에서 제외
+# ===================================================================
+
+echo ""
+log_info "API 서버 IP를 VPN 라우팅에서 제외 중..."
+
+# API 서버 IP 목록
+API_SERVERS=(
+    "61.84.75.37"      # Work API (allocate/result)
+    "220.121.120.83"   # Screenshot Upload
+)
+
+for api_ip in "${API_SERVERS[@]}"; do
+    # 기존 rule 확인
+    if ip rule list | grep -q "to $api_ip"; then
+        log_warn "$api_ip: 이미 라우팅 규칙 존재 (스킵)"
+    else
+        # 라우팅 규칙 추가 (priority 50 = VPN보다 우선)
+        ip rule add to "$api_ip" lookup main priority 50
+        log_success "$api_ip: VPN 우회 규칙 추가 (로컬 네트워크 사용)"
+    fi
+done
+
+# 재부팅 시 자동 복구를 위한 스크립트 생성
+RESTORE_SCRIPT="/usr/local/bin/restore-api-routes.sh"
+log_info "재부팅 시 자동 복구 스크립트 생성 중..."
+
+cat > "$RESTORE_SCRIPT" << 'RESTORE_EOF'
+#!/bin/bash
+# API 서버 라우팅 규칙 자동 복구
+
+API_SERVERS=(
+    "61.84.75.37"
+    "220.121.120.83"
+)
+
+for api_ip in "${API_SERVERS[@]}"; do
+    if ! ip rule list | grep -q "to $api_ip"; then
+        ip rule add to "$api_ip" lookup main priority 50
+    fi
+done
+RESTORE_EOF
+
+chmod +x "$RESTORE_SCRIPT"
+
+# systemd 서비스 생성
+SERVICE_FILE="/etc/systemd/system/restore-api-routes.service"
+log_info "systemd 서비스 생성 중..."
+
+cat > "$SERVICE_FILE" << 'SERVICE_EOF'
+[Unit]
+Description=Restore API Server Routes (bypass VPN)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/restore-api-routes.sh
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+SERVICE_EOF
+
+# 서비스 활성화
+systemctl daemon-reload
+systemctl enable restore-api-routes.service > /dev/null 2>&1
+log_success "재부팅 시 자동 복구 설정 완료"
+
 echo ""
 echo "============================================================"
 log_success "설정 완료!"
 echo "============================================================"
 echo ""
-log_info "이제 VPN 환경에서 API 요청이 로컬 네트워크로 우회됩니다"
+log_info "✅ Sudoers 설정 완료"
+log_info "✅ API 서버 VPN 우회 규칙 추가 완료"
+log_info "✅ 재부팅 시 자동 복구 설정 완료"
+echo ""
+log_info "📊 현재 라우팅 규칙:"
+ip rule list | grep -E "(61.84.75.37|220.121.120.83|uidrange)" | head -10
 echo ""

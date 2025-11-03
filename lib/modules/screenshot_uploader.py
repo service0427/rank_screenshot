@@ -109,6 +109,13 @@ class ScreenshotUploader:
                         'rank': metadata.get('rank', '')
                     }
 
+                    # POST 데이터 로그 출력
+                    import json
+                    print(f"   📋 전송 데이터:")
+                    print(f"      파일: {filepath.name}")
+                    for key, value in data.items():
+                        print(f"      {key}: {value}")
+
                     # POST 요청
                     response = requests.post(
                         self.upload_url,

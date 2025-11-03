@@ -284,8 +284,19 @@ def run_agent_selenium_uc(
             print("📤 작업 결과 제출")
             print("=" * 60 + "\n")
 
-            # 성공 시: 스크린샷 URL, 실패 시: "PRODUCT_NOT_FOUND"
-            screenshot_url = result.before_screenshot_url if result.success else "PRODUCT_NOT_FOUND"
+            # 성공 시: 스크린샷 URL 선택, 실패 시: "PRODUCT_NOT_FOUND"
+            if result.success:
+                # Edit 모드에서 after 스크린샷이 있으면 after 사용, 아니면 before 사용
+                if result.after_screenshot_url:
+                    screenshot_url = result.after_screenshot_url
+                    print(f"📤 스크린샷 URL: {screenshot_url}")
+                    print(f"   타입: 순위 조작 후 (after)")
+                else:
+                    screenshot_url = result.before_screenshot_url
+                    print(f"📤 스크린샷 URL: {screenshot_url}")
+                    print(f"   타입: 순위 조작 없음 (before)")
+            else:
+                screenshot_url = "PRODUCT_NOT_FOUND"
 
             submit_success = api_client.submit_result(
                 work_id=work_id,

@@ -307,13 +307,31 @@ class BrowserCoreUC:
         else:
             version_main = int(version)
 
+        # ChromeDriver 경로 설정
+        chromedriver_path = None
+        if version.lower() in ['beta', 'dev', 'canary']:
+            # 채널 버전
+            channel_dir = Path(Config.PROFILE_DIR_BASE).parent / "chrome-version" / version.lower()
+            chromedriver_bin = channel_dir / "chromedriver-linux64" / "chromedriver"
+            if chromedriver_bin.exists():
+                chromedriver_path = str(chromedriver_bin)
+        else:
+            # 일반 버전
+            version_dir = Path(Config.PROFILE_DIR_BASE).parent / "chrome-version" / version
+            chromedriver_bin = version_dir / "chromedriver-linux64" / "chromedriver"
+            if chromedriver_bin.exists():
+                chromedriver_path = str(chromedriver_bin)
+
         # ChromeDriver 서비스 포트 설정 (instance별 고유 포트)
         driver_port = 10000 + self.instance_id
 
-        # undetected-chromedriver 시작 (자동 ChromeDriver 다운로드)
+        # undetected-chromedriver 시작
         print(f"   Starting undetected-chromedriver (version_main={version_main})...")
         print(f"   Driver port: {driver_port}")
-        print(f"   This may take a while if downloading ChromeDriver...")
+        if chromedriver_path:
+            print(f"   ChromeDriver: {chromedriver_path}")
+        else:
+            print(f"   ⚠️  ChromeDriver not found, will download automatically (slow)")
 
         self.driver = uc.Chrome(
             browser_executable_path=chrome_path,
@@ -321,7 +339,7 @@ class BrowserCoreUC:
             headless=headless,
             use_subprocess=True,
             version_main=version_main,  # Major version
-            driver_executable_path=None,  # 자동 다운로드
+            driver_executable_path=chromedriver_path,  # 로컬 ChromeDriver 경로
             port=driver_port  # ChromeDriver 서비스 포트
         )
 

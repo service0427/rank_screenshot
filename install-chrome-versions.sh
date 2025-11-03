@@ -30,64 +30,101 @@ print_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
 print_warning() { echo -e "${YELLOW}[WARN]${NC} $1"; }
 print_error() { echo -e "${RED}[ERROR]${NC} $1"; }
 
-# Chrome 다운로드 및 설치
+# Chrome + ChromeDriver 다운로드 및 설치
 install_chrome() {
     local major=$1
     local version=$2
     local version_dir="${CHROME_BASE_DIR}/${major}"
 
     # 이미 설치되어 있는지 확인
-    if [ -d "$version_dir" ] && [ -f "$version_dir/chrome-linux64/chrome" ]; then
-        print_success "Chrome ${major} 이미 설치됨: $version_dir"
+    if [ -d "$version_dir" ] && [ -f "$version_dir/chrome-linux64/chrome" ] && [ -f "$version_dir/chromedriver-linux64/chromedriver" ]; then
+        print_success "Chrome ${major} + ChromeDriver 이미 설치됨: $version_dir"
         return 0
     fi
 
-    print_info "Chrome ${major} (v${version}) 다운로드 중..."
+    print_info "Chrome ${major} (v${version}) + ChromeDriver 다운로드 중..."
 
     mkdir -p "$version_dir"
 
-    # 다운로드 URL
+    # ===================================================================
+    # 1. Chrome 다운로드
+    # ===================================================================
     local chrome_url="${CHROME_FOR_TESTING_URL}/${version}/linux64/chrome-linux64.zip"
-    local zip_file="/tmp/chrome-${major}.zip"
+    local chrome_zip="/tmp/chrome-${major}.zip"
 
-    # 다운로드 (재시도 3회)
+    # Chrome 다운로드 (재시도 3회)
     local retry=0
     while [ $retry -lt 3 ]; do
-        if wget -q --show-progress "$chrome_url" -O "$zip_file" 2>&1; then
+        if wget -q --show-progress "$chrome_url" -O "$chrome_zip" 2>&1; then
             break
         fi
         retry=$((retry + 1))
         if [ $retry -lt 3 ]; then
-            print_warning "다운로드 실패, 재시도 중 ($retry/3)..."
+            print_warning "Chrome 다운로드 실패, 재시도 중 ($retry/3)..."
             sleep 2
         else
-            print_error "다운로드 실패: $chrome_url"
-            rm -f "$zip_file"
+            print_error "Chrome 다운로드 실패: $chrome_url"
+            rm -f "$chrome_zip"
             return 1
         fi
     done
 
-    print_info "압축 해제 중..."
+    print_info "Chrome 압축 해제 중..."
 
-    # 압축 해제
+    # Chrome 압축 해제
     if command -v unzip &> /dev/null; then
-        unzip -q "$zip_file" -d "$version_dir"
+        unzip -q "$chrome_zip" -d "$version_dir"
     else
         print_error "unzip이 설치되지 않았습니다: sudo apt-get install unzip"
-        rm -f "$zip_file"
+        rm -f "$chrome_zip"
         return 1
     fi
 
-    rm -f "$zip_file"
+    rm -f "$chrome_zip"
 
-    # 검증
-    if [ -f "$version_dir/chrome-linux64/chrome" ]; then
+    # ===================================================================
+    # 2. ChromeDriver 다운로드
+    # ===================================================================
+    local chromedriver_url="${CHROME_FOR_TESTING_URL}/${version}/linux64/chromedriver-linux64.zip"
+    local chromedriver_zip="/tmp/chromedriver-${major}.zip"
+
+    print_info "ChromeDriver ${major} (v${version}) 다운로드 중..."
+
+    # ChromeDriver 다운로드 (재시도 3회)
+    retry=0
+    while [ $retry -lt 3 ]; do
+        if wget -q --show-progress "$chromedriver_url" -O "$chromedriver_zip" 2>&1; then
+            break
+        fi
+        retry=$((retry + 1))
+        if [ $retry -lt 3 ]; then
+            print_warning "ChromeDriver 다운로드 실패, 재시도 중 ($retry/3)..."
+            sleep 2
+        else
+            print_error "ChromeDriver 다운로드 실패: $chromedriver_url"
+            rm -f "$chromedriver_zip"
+            return 1
+        fi
+    done
+
+    print_info "ChromeDriver 압축 해제 중..."
+
+    # ChromeDriver 압축 해제
+    unzip -q "$chromedriver_zip" -d "$version_dir"
+    rm -f "$chromedriver_zip"
+
+    # ===================================================================
+    # 3. 검증 및 권한 설정
+    # ===================================================================
+    if [ -f "$version_dir/chrome-linux64/chrome" ] && [ -f "$version_dir/chromedriver-linux64/chromedriver" ]; then
         echo "$version" > "$version_dir/VERSION"
+        echo "$major" > "$version_dir/MAJOR_VERSION"
         chmod +x "$version_dir/chrome-linux64/chrome"
-        print_success "Chrome ${major} 설치 완료: $version_dir"
+        chmod +x "$version_dir/chromedriver-linux64/chromedriver"
+        print_success "Chrome ${major} + ChromeDriver 설치 완료: $version_dir"
         return 0
     else
-        print_error "Chrome 바이너리를 찾을 수 없습니다"
+        print_error "Chrome 또는 ChromeDriver 바이너리를 찾을 수 없습니다"
         return 1
     fi
 }

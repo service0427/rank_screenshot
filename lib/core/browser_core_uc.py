@@ -320,6 +320,10 @@ class BrowserCoreUC:
             proxy_address=proxy_address
         )
 
+        # Chrome 바이너리 경로 명시 (undetected-chromedriver가 시스템 Chrome 사용 방지)
+        options.binary_location = chrome_path
+        print(f"   Chrome binary: {chrome_path}")
+
         # Major version 추출 (channels의 경우 MAJOR_VERSION 파일에서 읽기)
         if version.lower() in ['beta', 'dev', 'canary']:
             channel_dir = Path(Config.PROFILE_DIR_BASE).parent / "chrome-version" / version.lower()

@@ -63,33 +63,78 @@ class ProxyAPIClient:
         except ValueError as e:
             raise Exception(f"API 응답 파싱 실패: {e}")
 
-    def select_best_proxy(self, proxies: List[str]) -> str:
+    def test_proxy(self, proxy_address: str, timeout: int = 5) -> bool:
         """
-        프록시 목록에서 랜덤 선택
+        프록시 연결 테스트 (curl 명령 사용)
+
+        Args:
+            proxy_address: IP:port 형식
+            timeout: 타임아웃 (초)
+
+        Returns:
+            연결 가능 여부
+        """
+        import subprocess
+
+        try:
+            # curl로 프록시 테스트 (빠르게 HEAD 요청)
+            result = subprocess.run(
+                ['curl', '--socks5', proxy_address, '--head', '--max-time', str(timeout), 'https://www.coupang.com'],
+                capture_output=True,
+                timeout=timeout + 1
+            )
+            # 200, 403 등 응답이 오면 프록시는 작동함 (0 = 성공, 22 = 4xx/5xx HTTP 에러)
+            return result.returncode in [0, 22]
+        except:
+            return False
+
+    def select_best_proxy(self, proxies: List[str], test_connection: bool = True, max_retries: int = 3) -> str:
+        """
+        프록시 목록에서 랜덤 선택 (연결 테스트 포함)
 
         Args:
             proxies: fetch_proxies()로 가져온 프록시 IP 목록 (문자열 리스트)
+            test_connection: 연결 테스트 수행 여부 (기본 True)
+            max_retries: 연결 실패 시 재시도 횟수
 
         Returns:
             프록시 주소 (IP:port 형식, 예: "211.198.89.191:10000")
 
         Raises:
-            ValueError: 프록시 목록이 비어있을 때
+            ValueError: 프록시 목록이 비어있거나 모든 프록시 연결 실패
         """
         import random
 
         if not proxies:
             raise ValueError("사용 가능한 프록시가 없습니다")
 
-        # 프록시 IP 중 랜덤 선택
-        public_ip = random.choice(proxies)
+        tested_proxies = []
+        for attempt in range(max_retries):
+            # 이미 테스트한 프록시 제외
+            available = [p for p in proxies if p not in tested_proxies]
+            if not available:
+                break
 
-        # IP:PORT 형식 반환 (인증 불필요)
-        proxy_address = f"{public_ip}:{self.SOCKS5_PORT}"
+            public_ip = random.choice(available)
+            proxy_address = f"{public_ip}:{self.SOCKS5_PORT}"
+            tested_proxies.append(public_ip)
 
-        print(f"   ✓ 프록시 랜덤 선택: {proxy_address} [{len(proxies)}개 중 선택]")
+            print(f"   🔍 프록시 선택 시도 {attempt + 1}/{max_retries}: {proxy_address}")
 
-        return proxy_address
+            # 연결 테스트
+            if test_connection:
+                if self.test_proxy(proxy_address, timeout=3):
+                    print(f"   ✅ 프록시 연결 성공: {proxy_address}")
+                    return proxy_address
+                else:
+                    print(f"   ❌ 프록시 연결 실패: {proxy_address}")
+            else:
+                # 테스트 없이 선택
+                print(f"   ✓ 프록시 선택 (테스트 생략): {proxy_address}")
+                return proxy_address
+
+        # 모든 시도 실패
+        raise ValueError(f"{max_retries}번 시도했으나 작동하는 프록시를 찾지 못했습니다")
 
     def validate_proxy_format(self, proxy_address: str) -> bool:
         """

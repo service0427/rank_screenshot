@@ -49,6 +49,9 @@ class ScreenshotUploader:
                 - item_id: 아이템 ID
                 - vendor_item_id: 판매자 아이템 ID
                 - rank: 상품 순위
+                - match_product_id: product_id 일치 여부 (boolean)
+                - match_item_id: item_id 일치 여부 (boolean)
+                - match_vendor_item_id: vendor_item_id 일치 여부 (boolean)
 
         Returns:
             {
@@ -100,14 +103,17 @@ class ScreenshotUploader:
                         'image': (filepath.name, f, 'image/png')
                     }
 
-                    # 메타데이터를 form data로 추가 (필수 필드만)
+                    # 메타데이터를 form data로 추가
                     data = {
                         'screenshot_id': metadata.get('screenshot_id', ''),
                         'keyword': metadata.get('keyword', ''),
                         'product_id': metadata.get('product_id', ''),
                         'item_id': metadata.get('item_id', ''),
                         'vendor_item_id': metadata.get('vendor_item_id', ''),
-                        'rank': metadata.get('rank', '')
+                        'rank': metadata.get('rank', ''),
+                        'match_product_id': metadata.get('match_product_id', False),
+                        'match_item_id': metadata.get('match_item_id', False),
+                        'match_vendor_item_id': metadata.get('match_vendor_item_id', False)
                     }
 
                     # POST 데이터 로그 출력

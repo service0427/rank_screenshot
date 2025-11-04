@@ -403,7 +403,8 @@ class SearchWorkflow:
                 keyword=keyword,
                 version=version,
                 product_info=product_info,
-                result=result
+                result=result,
+                match_condition=match_condition
             )
 
             result.success = True
@@ -498,7 +499,8 @@ class SearchWorkflow:
         keyword: str,
         version: str,
         product_info: Dict,
-        result: 'SearchWorkflowResult'
+        result: 'SearchWorkflowResult',
+        match_condition: str = None
     ) -> bool:
         """
         스크린샷 캡처 (디버그 오버레이 포함)
@@ -508,6 +510,7 @@ class SearchWorkflow:
             version: Chrome 버전
             product_info: 상품 정보 딕셔너리
             result: SearchWorkflowResult 객체 (스크린샷 저장용)
+            match_condition: 매칭 조건 (메타데이터 생성용)
 
         Returns:
             성공 여부
@@ -561,7 +564,7 @@ class SearchWorkflow:
                 version=version,
                 overlay_text="",
                 full_page=False,
-                metadata=self._create_metadata(keyword, product_info)
+                metadata=self._create_metadata(keyword, product_info, match_condition)
             )
 
             return True
@@ -616,16 +619,63 @@ class SearchWorkflow:
             except:
                 pass
 
-    def _create_metadata(self, keyword: str, product_info: Dict) -> Dict[str, Any]:
-        """업로드용 메타데이터 생성"""
+    def _create_metadata(self, keyword: str, product_info: Dict, match_condition: str = None) -> Dict[str, Any]:
+        """
+        업로드용 메타데이터 생성
+
+        Args:
+            keyword: 검색 키워드
+            product_info: 상품 정보 딕셔너리
+            match_condition: 매칭 조건 문자열
+
+        Returns:
+            메타데이터 딕셔너리 (match_product_id, match_item_id, match_vendor_item_id 포함)
+        """
         url_params = self.finder.extract_url_params(product_info.get('link', ''))
+
+        # match_condition 문자열을 boolean 필드로 변환 (agent.py와 동일한 로직)
+        match_product_id = False
+        match_item_id = False
+        match_vendor_item_id = False
+
+        if match_condition:
+            if "완전 일치" in match_condition:
+                # 완전 일치: 3개 모두 매칭
+                match_product_id = True
+                match_item_id = True
+                match_vendor_item_id = True
+            elif "product_id + vendor_item_id 일치" in match_condition:
+                # product_id + vendor_item_id만 매칭
+                match_product_id = True
+                match_vendor_item_id = True
+            elif "product_id + item_id 일치" in match_condition:
+                # product_id + item_id만 매칭
+                match_product_id = True
+                match_item_id = True
+            elif "item_id + vendor_item_id 일치" in match_condition:
+                # item_id + vendor_item_id만 매칭
+                match_item_id = True
+                match_vendor_item_id = True
+            elif "product_id만 일치" in match_condition:
+                # product_id만 매칭
+                match_product_id = True
+            elif "item_id만 일치" in match_condition:
+                # item_id만 매칭
+                match_item_id = True
+            elif "vendor_item_id만 일치" in match_condition:
+                # vendor_item_id만 매칭
+                match_vendor_item_id = True
+
         return {
             'screenshot_id': self.screenshot_id if hasattr(self, 'screenshot_id') and self.screenshot_id else '',
             'keyword': keyword,
             'product_id': url_params['product_id'],
             'item_id': url_params['item_id'],
             'vendor_item_id': url_params['vendor_item_id'],
-            'rank': str(product_info.get('rank', 'unknown'))
+            'rank': str(product_info.get('rank', 'unknown')),
+            'match_product_id': match_product_id,
+            'match_item_id': match_item_id,
+            'match_vendor_item_id': match_vendor_item_id
         }
 
     def _add_debug_overlay(self, all_items: list, items_info: list, rank_offset: int = 0, total_items_offset: int = 0, ad_offset: int = 0):

@@ -294,6 +294,8 @@ def run_agent_selenium_uc(
                 print("=" * 60)
                 print(f"   차단 사유: {result.error_message}")
                 print(f"   작업 ID {screenshot_id}는 제출하지 않습니다\n")
+                # 차단 감지 시 자동 종료 플래그 설정
+                close_after = True
             else:
                 print("\n" + "=" * 60)
                 print("📤 작업 결과 제출")
@@ -321,10 +323,13 @@ def run_agent_selenium_uc(
                 if result.success and hasattr(result, 'matched_product') and result.matched_product:
                     rank = result.matched_product.get('rank')
 
-                # 매칭 조건에 따라 실제로 일치한 필드만 전달
+                # 매칭 조건을 boolean 필드로 변환
                 api_product_id = None
                 api_item_id = None
                 api_vendor_item_id = None
+                match_product_id = False
+                match_item_id = False
+                match_vendor_item_id = False
 
                 if result.success and hasattr(result, 'match_condition') and result.match_condition:
                     match_cond = result.match_condition
@@ -334,19 +339,27 @@ def run_agent_selenium_uc(
                         api_product_id = product_id
                         api_item_id = item_id
                         api_vendor_item_id = vendor_item_id
+                        match_product_id = True
+                        match_item_id = True
+                        match_vendor_item_id = True
                     elif "product_id + vendor_item_id 일치" in match_cond:
                         # product_id + vendor_item_id만 일치
                         api_product_id = product_id
                         api_vendor_item_id = vendor_item_id
+                        match_product_id = True
+                        match_vendor_item_id = True
                     elif "product_id 일치" in match_cond:
                         # product_id만 일치
                         api_product_id = product_id
+                        match_product_id = True
                     elif "vendor_item_id 일치" in match_cond:
                         # vendor_item_id만 일치
                         api_vendor_item_id = vendor_item_id
+                        match_vendor_item_id = True
                     elif "item_id 일치" in match_cond:
                         # item_id만 일치
                         api_item_id = item_id
+                        match_item_id = True
 
                 submit_success = api_client.submit_result(
                     screenshot_id=screenshot_id,
@@ -356,7 +369,10 @@ def run_agent_selenium_uc(
                     product_id=api_product_id,
                     item_id=api_item_id,
                     vendor_item_id=api_vendor_item_id,
-                    filename=filename
+                    filename=filename,
+                    match_product_id=match_product_id,
+                    match_item_id=match_item_id,
+                    match_vendor_item_id=match_vendor_item_id
                 )
 
                 if submit_success:
@@ -806,6 +822,21 @@ Examples:
     # === VPN 재실행 로직 ===
     if args.vpn is not None:
         if not os.environ.get('VPN_EXECUTED'):
+            # VPN 전환 전에 tech 사용자 권한으로 X11 권한 부여
+            vpn_user = f"vpn{args.vpn}"
+            try:
+                import subprocess
+                display = os.environ.get('DISPLAY', ':0')
+                cmd = ['xhost', f'+SI:localuser:{vpn_user}']
+                env = os.environ.copy()
+                env['DISPLAY'] = display
+
+                result = subprocess.run(cmd, env=env, capture_output=True, text=True, timeout=5)
+                if result.returncode == 0:
+                    print(f"   ✓ X11 권한 부여: {vpn_user}\n")
+            except Exception:
+                pass  # 실패해도 계속 진행
+
             vpn_cmd = shutil.which('vpn')
 
             if not vpn_cmd:
@@ -844,6 +875,7 @@ Examples:
                    'python3'] + new_args
             os.execvpe(vpn_cmd, cmd, os.environ.copy())
             return
+
     # === 작업 API 모드 ===
     if args.work_api or ENABLE_WORK_API:
         print("\n🔄 작업 API 모드 활성화")
@@ -860,7 +892,7 @@ Examples:
         success = run_work_api_mode(
             instance_id=args.instance,
             version=args.version,
-            close_after=args.close,
+            close_after=True,  # work-api 모드에서는 항상 자동 종료
             fresh_profile=args.fresh_profile,
             check_ip=args.ip_check,
             window_width=args.window_width,

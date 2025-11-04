@@ -44,3 +44,4 @@ videos/
 
 # curl-cffi test outputs
 output/
+blocked_combinations.json

@@ -85,19 +85,10 @@ class BrowserCoreUC:
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-blink-features=AutomationControlled")
 
-        # SOCKS5 프록시 설정 (인증 정보 포함)
+        # SOCKS5 프록시 설정 (인증 불필요)
         if proxy_address:
             options.add_argument(f"--proxy-server=socks5://{proxy_address}")
-
-            # 비밀번호 마스킹 처리 (로그 출력용)
-            display_address = proxy_address
-            if '@' in proxy_address:
-                auth_part, addr_part = proxy_address.split('@', 1)
-                if ':' in auth_part:
-                    user, _ = auth_part.split(':', 1)
-                    display_address = f"{user}:****@{addr_part}"
-
-            print(f"   🌐 SOCKS5 프록시 설정: {display_address}")
+            print(f"   🌐 SOCKS5 프록시 설정: {proxy_address}")
 
         # 네트워크 필터 (Chrome Extension - declarativeNetRequest)
         if enable_network_filter:

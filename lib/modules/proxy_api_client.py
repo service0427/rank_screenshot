@@ -13,13 +13,11 @@ class ProxyAPIClient:
     프록시 API 클라이언트
 
     API 엔드포인트: http://220.121.120.83/vpn_socks5/api/list.php?type=proxy
-    SOCKS5 인증: techb:Tech1324
-    응답 형식: ["IP1", "IP2", ...] (간소화된 IP 리스트)
+    응답 형식: ["IP1", "IP2", ...] (IP 리스트, 인증 불필요)
     """
 
     API_URL = "http://220.121.120.83/vpn_socks5/api/list.php?type=proxy"
-    SOCKS5_USERNAME = "techb"
-    SOCKS5_PASSWORD = "Tech1324"
+    SOCKS5_PORT = 10000  # 고정 포트
 
     def __init__(self, timeout: int = 10):
         """
@@ -73,7 +71,7 @@ class ProxyAPIClient:
             proxies: fetch_proxies()로 가져온 프록시 IP 목록 (문자열 리스트)
 
         Returns:
-            프록시 주소 (인증 정보 포함, 예: "techb:Tech1324@211.198.89.191:10000")
+            프록시 주소 (IP:port 형식, 예: "211.198.89.191:10000")
 
         Raises:
             ValueError: 프록시 목록이 비어있을 때
@@ -85,13 +83,11 @@ class ProxyAPIClient:
 
         # 프록시 IP 중 랜덤 선택
         public_ip = random.choice(proxies)
-        socks5_port = 10000  # 고정 포트
 
-        # 인증 정보 포함한 프록시 주소 생성
-        # 형식: "username:password@IP:port"
-        proxy_address = f"{self.SOCKS5_USERNAME}:{self.SOCKS5_PASSWORD}@{public_ip}:{socks5_port}"
+        # IP:PORT 형식 반환 (인증 불필요)
+        proxy_address = f"{public_ip}:{self.SOCKS5_PORT}"
 
-        print(f"   ✓ 프록시 랜덤 선택: {public_ip}:{socks5_port} [{len(proxies)}개 중 선택]")
+        print(f"   ✓ 프록시 랜덤 선택: {proxy_address} [{len(proxies)}개 중 선택]")
 
         return proxy_address
 
@@ -100,19 +96,13 @@ class ProxyAPIClient:
         프록시 주소 형식 검증
 
         Args:
-            proxy_address: 프록시 주소 (IP:port 또는 user:pass@IP:port 형식)
+            proxy_address: 프록시 주소 (IP:port 형식)
 
         Returns:
             유효 여부
         """
         if not proxy_address:
             return False
-
-        # 인증 정보 포함 형식: user:pass@IP:port
-        if '@' in proxy_address:
-            auth_part, addr_part = proxy_address.split('@', 1)
-            # auth_part 검증 생략 (user:pass 형식)
-            proxy_address = addr_part
 
         parts = proxy_address.split(':')
         if len(parts) != 2:
@@ -152,7 +142,7 @@ def get_proxy_address(proxy_arg: str = None) -> Optional[str]:
         proxy_arg: --proxy 옵션 값 ('auto' 또는 'IP:port')
 
     Returns:
-        프록시 주소 (인증 정보 포함, 예: "techb:Tech1324@IP:10000") 또는 None
+        프록시 주소 (IP:port 형식, 예: "211.198.89.191:10000") 또는 None
     """
     if not proxy_arg:
         return None
@@ -172,10 +162,6 @@ def get_proxy_address(proxy_arg: str = None) -> Optional[str]:
         # 수동 지정
         print(f"🌐 프록시 수동 지정: {proxy_arg}")
         client = ProxyAPIClient()
-
-        # 인증 정보 없이 지정된 경우 자동 추가
-        if '@' not in proxy_arg:
-            proxy_arg = f"{client.SOCKS5_USERNAME}:{client.SOCKS5_PASSWORD}@{proxy_arg}"
 
         if not client.validate_proxy_format(proxy_arg):
             print(f"   ❌ 잘못된 프록시 형식: {proxy_arg} (올바른 형식: IP:port)")

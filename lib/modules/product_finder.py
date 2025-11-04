@@ -499,6 +499,9 @@ class ProductFinder:
 
             print(f"\n📍 상품을 화면 중앙으로 이동 중...")
 
+            # Lazy loading 이미지 강제 로드 (스크롤 전에 트리거)
+            self._trigger_lazy_images(element)
+
             # 사람처럼 자연스럽게 스크롤 (여러 단계로 나눠서)
             if video_recorder:
                 # 1. 목표 상품 위치 계산
@@ -547,7 +550,11 @@ class ProductFinder:
                         inline: 'nearest'
                     });
                 """, element)
-                time.sleep(1.5)
+                time.sleep(3.5)  # 썸네일 이미지 로드 대기 시간 증가 (1.5초 → 3.5초)
+
+            # 이미지 로드 완료 대기 (스크롤 후)
+            print("   ⏳ 썸네일 이미지 로드 대기 중...")
+            self._wait_for_images_loaded(timeout=5)
 
             # 요소가 화면에 보이는지 확인
             is_visible = self.driver.execute_script("""
@@ -1036,3 +1043,105 @@ class ProductFinder:
         print(f"❌ 매칭되는 상품을 찾지 못했습니다")
         print(f"   검색 조건: product_id={product_id}, item_id={item_id}, vendor_item_id={vendor_item_id}")
         return (None, None)
+
+    def _wait_for_images_loaded(self, timeout: int = 5) -> bool:
+        """
+        뷰포트 내 모든 이미지 로드 완료 대기
+
+        Args:
+            timeout: 최대 대기 시간 (초)
+
+        Returns:
+            성공 여부 (True: 모든 이미지 로드 완료, False: 타임아웃 또는 일부 실패)
+        """
+        try:
+            # JavaScript로 뷰포트 내 이미지 로드 상태 확인
+            wait_script = """
+            return new Promise((resolve) => {
+                const startTime = Date.now();
+                const timeout = arguments[0] * 1000;
+
+                function checkImages() {
+                    // 뷰포트 내 이미지만 확인
+                    const images = Array.from(document.querySelectorAll('img')).filter(img => {
+                        const rect = img.getBoundingClientRect();
+                        return rect.top >= 0 &&
+                               rect.bottom <= window.innerHeight &&
+                               rect.left >= 0 &&
+                               rect.right <= window.innerWidth;
+                    });
+
+                    // 모든 이미지 로드 완료 체크
+                    const allLoaded = images.every(img => img.complete && img.naturalHeight > 0);
+
+                    if (allLoaded) {
+                        resolve({ success: true, count: images.length });
+                    } else if (Date.now() - startTime > timeout) {
+                        // 타임아웃
+                        const pending = images.filter(img => !img.complete || img.naturalHeight === 0).length;
+                        resolve({ success: false, count: images.length, pending: pending });
+                    } else {
+                        // 재시도
+                        setTimeout(checkImages, 100);
+                    }
+                }
+
+                checkImages();
+            });
+            """
+
+            result = self.driver.execute_async_script(wait_script, timeout)
+
+            if result['success']:
+                print(f"   ✅ {result['count']}개 이미지 로드 완료")
+                return True
+            else:
+                print(f"   ⚠️  {result['pending']}/{result['count']}개 이미지 로드 지연 (타임아웃)")
+                # 일부 이미지가 로드되지 않아도 계속 진행
+                return False
+
+        except Exception as e:
+            print(f"   ⚠️  이미지 로드 확인 실패: {e}")
+            # 폴백: 고정 1초 대기
+            time.sleep(1)
+            return False
+
+    def _trigger_lazy_images(self, container_element) -> None:
+        """
+        컨테이너 내 lazy loading 이미지 강제 로드
+
+        Args:
+            container_element: 상품 컨테이너 요소
+        """
+        try:
+            trigger_script = """
+            const container = arguments[0];
+
+            // 1. loading="lazy" 속성을 eager로 변경
+            const lazyImages = container.querySelectorAll('img[loading="lazy"]');
+            lazyImages.forEach(img => {
+                img.loading = 'eager';
+            });
+
+            // 2. data-src를 src로 강제 적용 (일부 구현 방식)
+            const dataSrcImages = container.querySelectorAll('img[data-src]');
+            dataSrcImages.forEach(img => {
+                if (!img.src || img.src.includes('placeholder')) {
+                    img.src = img.dataset.src;
+                }
+            });
+
+            // 3. IntersectionObserver 강제 트리거 (화면에 보이는 것처럼)
+            container.querySelectorAll('img').forEach(img => {
+                img.scrollIntoView({ block: 'nearest', inline: 'nearest' });
+            });
+
+            return lazyImages.length + dataSrcImages.length;
+            """
+
+            count = self.driver.execute_script(trigger_script, container_element)
+            if count > 0:
+                print(f"   🔄 {count}개 lazy 이미지 트리거 완료")
+
+        except Exception as e:
+            print(f"   ⚠️  Lazy loading 트리거 실패: {e}")

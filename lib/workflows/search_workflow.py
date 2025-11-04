@@ -481,17 +481,17 @@ class SearchWorkflow:
                     break
                 time.sleep(0.1)
 
-            # 3. 추가 2초 대기 (동적 콘텐츠 렌더링 완료 보장)
-            print("⏳ 페이지 로딩 완료 - 2초 안정화 대기 중...")
-            time.sleep(2)
+            # 3. 추가 3초 대기 (동적 콘텐츠 렌더링 완료 보장)
+            print("⏳ 페이지 로딩 완료 - 3초 안정화 대기 중...")
+            time.sleep(3)
 
             print("✅ 페이지 완전히 로드됨")
             return True
 
         except Exception as e:
             print(f"⚠️  페이지 로딩 대기 실패: {e}")
-            # 실패해도 2초는 대기
-            time.sleep(2)
+            # 실패해도 3초는 대기
+            time.sleep(3)
             return False
 
     def _display_watermark_and_capture(

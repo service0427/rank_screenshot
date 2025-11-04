@@ -182,7 +182,25 @@ class Config:
     # Hub Server
     HUB_SERVER_URL = "http://mkt.techb.kr:3001"
 
-    # Browser Profiles (프로젝트 루트 기준 상대 경로)
+    # Browser Profiles (사용자별 독립 디렉토리)
+    # VPN 사용 시 각 사용자(vpn0, vpn1...)가 자신의 홈 디렉토리에 프로필 저장
+    # 이를 통해 권한 충돌 및 리소스 공유 문제 방지
+    @staticmethod
+    def get_profile_dir_base():
+        import os
+        from pathlib import Path
+
+        # 현재 사용자의 홈 디렉토리 확인
+        user = os.getenv('USER', 'unknown')
+        home_dir = Path.home()
+
+        # 홈 디렉토리에 .coupang_agent_profiles 생성
+        profile_base = home_dir / ".coupang_agent_profiles"
+        profile_base.mkdir(parents=True, exist_ok=True)
+
+        return str(profile_base)
+
+    # 레거시 호환성 유지 (기본값)
     PROFILE_DIR_BASE = str(Path(__file__).parent.parent / "browser-profiles")
 
     # Debug Settings

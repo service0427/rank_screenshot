@@ -65,7 +65,7 @@ class BrowserCoreUC:
 
         return versions
 
-    def get_chrome_options(self, use_profile: bool = True, window_position: str = None, enable_network_filter: bool = False):
+    def get_chrome_options(self, use_profile: bool = True, window_position: str = None, enable_network_filter: bool = False, proxy_address: str = None):
         """
         Chrome 옵션 설정
 
@@ -73,6 +73,7 @@ class BrowserCoreUC:
             use_profile: 프로필 사용 여부
             window_position: 창 위치 (예: "100,200")
             enable_network_filter: 네트워크 필터 활성화 여부
+            proxy_address: SOCKS5 프록시 주소 (예: "112.161.54.7:10022")
 
         Returns:
             Chrome Options
@@ -84,6 +85,11 @@ class BrowserCoreUC:
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-blink-features=AutomationControlled")
 
+        # SOCKS5 프록시 설정
+        if proxy_address:
+            options.add_argument(f"--proxy-server=socks5://{proxy_address}")
+            print(f"   🌐 SOCKS5 프록시 설정: {proxy_address}")
+
         # 네트워크 필터 (Chrome Extension - declarativeNetRequest)
         if enable_network_filter:
             if self.extension_dir.exists():
@@ -93,9 +99,11 @@ class BrowserCoreUC:
             else:
                 print(f"   ⚠️  네트워크 필터 Extension 없음: {self.extension_dir}")
 
-        # 창 위치 지정 (WSL 환경에서 set_window_position 무시 문제 해결)
+        # 창 위치 지정 (첫 실행 시에만 사용, 이후에는 저장된 위치 우선)
         if window_position:
             options.add_argument(f"--window-position={window_position}")
+            # 세션 크래시 팝업만 비활성화 (창 위치 복원은 허용)
+            options.add_argument("--disable-session-crashed-bubble")
 
         # Chrome for Testing 경고 메시지 제거
         options.add_argument("--disable-infobars")
@@ -167,7 +175,8 @@ class BrowserCoreUC:
         window_height: int = 1200,
         window_x: int = 10,
         window_y: int = 10,
-        enable_network_filter: bool = False
+        enable_network_filter: bool = False,
+        proxy_address: str = None
     ):
         """
         Chrome 실행 (undetected-chromedriver)
@@ -181,6 +190,8 @@ class BrowserCoreUC:
             window_height: 창 높이 (기본: 1200)
             window_x: 창 X 위치 (기본: 10)
             window_y: 창 Y 위치 (기본: 10)
+            enable_network_filter: 네트워크 필터 활성화 여부
+            proxy_address: SOCKS5 프록시 주소 (예: "112.161.54.7:10022")
 
         Returns:
             WebDriver 객체
@@ -213,25 +224,13 @@ class BrowserCoreUC:
             chrome_path = versions[version]
 
         # 버전별 + 사용자별 프로필 디렉토리 설정
-        # 우선순위 (소유권 문제 해결):
-        # 1. VPN + instance: instance + VPN 조합 (run_workers.py 멀티워커 + VPN 랜덤)
-        # 2. VPN만: vpn 번호 기반 (레거시, 직접 실행)
-        # 3. 일반 + 멀티 instance: instance 기반
-        # 4. 일반 + 단일: 공통 프로필
+        # 각 사용자(tech, vpn0, vpn1...)가 자신의 홈 디렉토리에 독립 프로필 저장
+        # 소유권 충돌, /tmp 충돌, 리소스 공유 문제 완전 방지
+        profile_base = Config.get_profile_dir_base()  # 사용자별 독립 디렉토리
         vpn_num = os.getenv('VPN_EXECUTED')
-        if vpn_num and self.instance_id >= 1:
-            # VPN + instance 조합: 소유권 충돌 방지를 위해 instance+VPN 모두 사용
-            # run_workers.py에서 VPN 랜덤 선택 시 같은 instance가 다른 VPN으로 실행될 수 있음
-            self.profile_dir = Path(Config.PROFILE_DIR_BASE) / f"instance-{self.instance_id}-vpn{vpn_num}-chrome-{version}"
-        elif vpn_num:
-            # VPN만 (직접 실행): vpn 번호 기반 (레거시)
-            self.profile_dir = Path(Config.PROFILE_DIR_BASE) / f"vpn{vpn_num}-chrome-{version}"
-        elif self.instance_id > 1:
-            # 일반 + 멀티 인스턴스: instance 기반
-            self.profile_dir = Path(Config.PROFILE_DIR_BASE) / f"instance-{self.instance_id}-chrome-{version}"
-        else:
-            # 일반 + 단일: 공통 프로필
-            self.profile_dir = Path(Config.PROFILE_DIR_BASE) / f"chrome-{version}"
+
+        # 각 Worker(instance)마다 별도 프로필 사용 (창 위치 독립 저장)
+        self.profile_dir = Path(profile_base) / f"instance-{self.instance_id}-chrome-{version}"
 
         # 프로필 디렉토리 처리
         # VPN 번호별로 이미 분리되어 있으므로 각 사용자가 자신의 디렉토리만 사용
@@ -254,6 +253,33 @@ class BrowserCoreUC:
         print(f"   Creating profile directory...")
 
         try:
+            # 소유권 충돌 체크: 다른 사용자가 생성한 프로필 디렉토리 확인
+            if self.profile_dir.exists():
+                import pwd
+                current_uid = os.getuid()
+                profile_stat = self.profile_dir.stat()
+                profile_owner_uid = profile_stat.st_uid
+
+                if current_uid != profile_owner_uid:
+                    # 다른 사용자 소유의 프로필 발견
+                    profile_owner = pwd.getpwuid(profile_owner_uid).pw_name
+                    current_user = pwd.getpwuid(current_uid).pw_name
+
+                    print(f"   ⚠️  소유권 충돌 감지!")
+                    print(f"   현재 사용자: {current_user} (UID: {current_uid})")
+                    print(f"   프로필 소유자: {profile_owner} (UID: {profile_owner_uid})")
+                    print(f"   🗑️  충돌 해결: 기존 프로필 삭제 후 재생성")
+
+                    # 다른 사용자 소유 프로필 삭제 (sudo 필요할 수 있음)
+                    import shutil
+                    try:
+                        shutil.rmtree(self.profile_dir, ignore_errors=True)
+                        print(f"   ✓ 기존 프로필 삭제 완료")
+                    except Exception as rm_error:
+                        print(f"   ❌ 프로필 삭제 실패: {rm_error}")
+                        print(f"   💡 수동 삭제 필요: sudo rm -rf {self.profile_dir}")
+                        raise
+
             if fresh_profile and self.profile_dir.exists():
                 # 옵션 1: 프로필 완전 삭제 후 재생성
                 import shutil
@@ -285,13 +311,14 @@ class BrowserCoreUC:
                 print(f"   Mode: Reuse profile (쿠키/세션/스토리지 삭제됨)")
 
         # Chrome 옵션
-        # 프로필 사용 시: 저장된 창 위치 자동 복원 (window_position 인자 없음)
-        # 프로필 미사용 시: 지정된 위치로 창 열기
-        if use_profile:
-            options = self.get_chrome_options(use_profile=True, window_position=None, enable_network_filter=enable_network_filter)
-        else:
-            window_position_arg = f"{window_x},{window_y}"
-            options = self.get_chrome_options(use_profile=False, window_position=window_position_arg, enable_network_filter=enable_network_filter)
+        # 창 위치 설정 (프로필 사용 여부와 무관하게 항상 적용)
+        window_position_arg = f"{window_x},{window_y}"
+        options = self.get_chrome_options(
+            use_profile=use_profile,
+            window_position=window_position_arg,
+            enable_network_filter=enable_network_filter,
+            proxy_address=proxy_address
+        )
 
         # Major version 추출 (channels의 경우 MAJOR_VERSION 파일에서 읽기)
         if version.lower() in ['beta', 'dev', 'canary']:
@@ -324,6 +351,12 @@ class BrowserCoreUC:
 
         # ChromeDriver 서비스 포트 설정 (instance별 고유 포트)
         driver_port = 10000 + self.instance_id
+
+        # X11 DISPLAY 환경 변수 설정 (VPN 사용자 등 GUI 실행에 필수)
+        # VPN 래퍼에서 DISPLAY=:0을 전달하지만, subprocess 실행 시 손실될 수 있으므로 명시적 설정
+        if 'DISPLAY' not in os.environ:
+            os.environ['DISPLAY'] = ':0'
+            print(f"   ⚠️  DISPLAY 환경 변수가 없어 :0으로 설정")
 
         # undetected-chromedriver 시작
         print(f"   Starting undetected-chromedriver (version_main={version_main})...")
@@ -358,7 +391,21 @@ class BrowserCoreUC:
         self.driver.set_window_size(actual_window_width, actual_window_height)
         time.sleep(0.3)  # 창 크기 적용 대기
 
-        # 창 위치: 프로필 사용 시 자동 복원, 미사용 시 --window-position 인자로 설정됨
+        # 창 위치 확인 (디버그)
+        try:
+            actual_pos = self.driver.get_window_position()
+            print(f"   🔍 실제 창 위치: x={actual_pos['x']}, y={actual_pos['y']}")
+            print(f"   🎯 요청한 위치: x={window_x}, y={window_y}")
+
+            # 위치가 맞지 않으면 강제 설정
+            if abs(actual_pos['x'] - window_x) > 50 or abs(actual_pos['y'] - window_y) > 50:
+                print(f"   ⚠️  위치 불일치 감지 - 강제 조정")
+                self.driver.set_window_position(window_x, window_y)
+                time.sleep(0.3)
+                new_pos = self.driver.get_window_position()
+                print(f"   ✓ 조정 후 위치: x={new_pos['x']}, y={new_pos['y']}")
+        except Exception as e:
+            print(f"   ⚠️  창 위치 확인 실패: {e}")
 
         # 그 다음 viewport 설정 (내부 콘텐츠 영역)
         try:
@@ -659,14 +706,52 @@ class BrowserCoreUC:
         pass  # --host-rules는 런타임에 변경 불가
 
     def close_browser(self):
-        """브라우저 종료"""
+        """브라우저 종료 (강화 버전: psutil 기반 강제 종료 및 좀비 회수)"""
+        import psutil
+        import time
+
         print(f"👋 Closing browser...")
 
         if self.driver:
             try:
+                # 1. 정상 종료 시도
                 self.driver.quit()
-            except:
-                pass
+                time.sleep(1)  # 종료 대기
+                print(f"   ✓ driver.quit() 성공")
+            except Exception as e:
+                print(f"   ⚠️  driver.quit() 실패: {e}")
+
+                # 2. 강제 종료: 현재 프로세스의 자식 Chrome/ChromeDriver 프로세스 kill
+                try:
+                    current_process = psutil.Process()
+                    children = current_process.children(recursive=True)
+
+                    killed_count = 0
+                    for child in children:
+                        try:
+                            child_name = child.name().lower()
+                            if 'chrome' in child_name or 'chromedriver' in child_name:
+                                print(f"   🔪 강제 종료: PID {child.pid} ({child.name()})")
+                                child.kill()
+                                killed_count += 1
+                        except (psutil.NoSuchProcess, psutil.AccessDenied):
+                            pass
+
+                    if killed_count > 0:
+                        print(f"   ✓ {killed_count}개 프로세스 강제 종료")
+
+                    # 3. 좀비 회수 (최대 3초 대기)
+                    time.sleep(0.5)
+                    for child in children:
+                        try:
+                            if child.is_running():
+                                child.wait(timeout=3)
+                        except (psutil.NoSuchProcess, psutil.TimeoutExpired):
+                            pass
+
+                except Exception as kill_error:
+                    print(f"   ⚠️  강제 종료 실패: {kill_error}")
+
             self.driver = None
 
         self.stats["active"] = False

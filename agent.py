@@ -118,7 +118,8 @@ def run_agent_selenium_uc(
     enable_rank_adjust: bool = False,  # Adjust 모드 (미래 개발용)
     adjust_mode: str = None,  # "adjust" 또는 "adjust2" (미래 개발용)
     min_rank: int = None,  # Adjust 모드용 최소 순위 (미래 개발용)
-    enable_main_filter: bool = False
+    enable_main_filter: bool = False,
+    proxy_address: str = None  # SOCKS5 프록시 주소
 ):
     """
     Selenium + undetected-chromedriver 에이전트 실행 (리팩토링 버전)
@@ -170,7 +171,8 @@ def run_agent_selenium_uc(
             window_height=window_height,
             enable_network_filter=enable_main_filter,
             window_x=window_x,
-            window_y=window_y
+            window_y=window_y,
+            proxy_address=proxy_address
         )
         if not driver:
             print("❌ Failed to launch browser")
@@ -217,8 +219,19 @@ def run_agent_selenium_uc(
                 print("   ✅ 탐지 테스트 모드 (자동 진행)")
                 time.sleep(3)
 
-        # === 4. 모듈 초기화 ===
-        handler = CoupangHandlerSelenium(driver)
+        # === 4. 네트워크 모드 결정 ===
+        network_mode = "Local"
+        if proxy_address:
+            network_mode = "Proxy"
+        else:
+            # VPN 사용자인지 확인 (vpn0, vpn1, ... 형식)
+            current_user = os.getenv('USER', '')
+            if current_user.startswith('vpn'):
+                vpn_num = current_user[3:]  # "vpn0" -> "0"
+                network_mode = f"VPN {vpn_num}"
+
+        # === 5. 모듈 초기화 ===
+        handler = CoupangHandlerSelenium(driver, network_mode=network_mode)
         finder = ProductFinder(driver)
         screenshot_processor = ScreenshotProcessor(
             driver=driver,
@@ -227,7 +240,7 @@ def run_agent_selenium_uc(
             enable_upload=ENABLE_SCREENSHOT_UPLOAD
         )
 
-        # === 5. 워크플로우 실행 ===
+        # === 6. 워크플로우 실행 ===
         workflow = SearchWorkflow(
             driver=driver,
             handler=handler,
@@ -421,7 +434,8 @@ def run_work_api_mode(
     enable_rank_adjust: bool = False,
     adjust_mode: str = None,
     enable_main_filter: bool = False,
-    specified_screenshot_id: int = None
+    specified_screenshot_id: int = None,
+    proxy_address: str = None
 ):
     """
     작업 API 모드 실행
@@ -474,12 +488,8 @@ def run_work_api_mode(
     print(f"\n✅ 작업 할당 완료 - 에이전트 실행")
     print("=" * 60 + "\n")
 
-    # Instance별로 창 위치 자동 조정 (멀티 워커 지원)
-    # Instance 1: (10, 10), Instance 2: (10 + 1300, 10), Instance 3: (10, 10 + 1200), ...
-    calc_x = window_x + ((instance_id - 1) % 2) * window_width
-    calc_y = window_y + ((instance_id - 1) // 2) * window_height
-
-    # 에이전트 실행
+    # 에이전트 실행 (창 위치는 명령행 옵션 그대로 사용)
+    # run_workers.py에서 이미 계산된 위치를 전달받음
     success = run_agent_selenium_uc(
         instance_id=instance_id,
         keyword=keyword,
@@ -495,12 +505,13 @@ def run_work_api_mode(
         check_ip=check_ip,
         window_width=window_width,
         window_height=window_height,
-        window_x=calc_x,
-        window_y=calc_y,
+        window_x=window_x,
+        window_y=window_y,
         enable_rank_adjust=enable_rank_adjust,
         adjust_mode=adjust_mode,
         min_rank=min_rank,
-        enable_main_filter=enable_main_filter
+        enable_main_filter=enable_main_filter,
+        proxy_address=proxy_address
     )
 
     return success
@@ -646,6 +657,15 @@ Examples:
         default=None,
         metavar="N",
         help="VPN server number (0=wg0/vpn0, 1=wg1/vpn1, etc.)"
+    )
+
+    core_group.add_argument(
+        "--proxy",
+        nargs="?",
+        const="auto",
+        default=None,
+        metavar="ADDR",
+        help="SOCKS5 proxy (no value=auto select from API, value=manual specify like 123.123.123.123:10001)"
     )
 
     core_group.add_argument(
@@ -819,6 +839,21 @@ Examples:
             return
         print("=" * 60 + "\n")
 
+    # === VPN과 Proxy 배타적 체크 ===
+    if args.vpn is not None and args.proxy:
+        print("❌ Error: --vpn과 --proxy는 동시 사용 불가")
+        print("   Local / VPN / Proxy 중 하나만 선택하세요")
+        return
+
+    # === Proxy 주소 가져오기 ===
+    proxy_address = None
+    if args.proxy:
+        from lib.modules.proxy_api_client import get_proxy_address
+        proxy_address = get_proxy_address(args.proxy)
+        if not proxy_address:
+            print("❌ Error: 프록시 주소를 가져올 수 없습니다")
+            return
+
     # === VPN 재실행 로직 ===
     if args.vpn is not None:
         if not os.environ.get('VPN_EXECUTED'):
@@ -902,7 +937,8 @@ Examples:
             enable_rank_adjust=args.adjust,
             adjust_mode="adjust" if args.adjust else None,
             enable_main_filter=args.enable_main_filter,
-            specified_screenshot_id=specified_screenshot_id
+            specified_screenshot_id=specified_screenshot_id,
+            proxy_address=proxy_address
         )
         sys.exit(0 if success else 1)
 

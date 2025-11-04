@@ -13,7 +13,7 @@ from selenium.common.exceptions import TimeoutException, NoSuchElementException
 from selenium.webdriver.common.keys import Keys
 
 from ..constants import ExecutionStatus, ActionStatus
-from ..utils.human_behavior_selenium import natural_typing
+from ..utils.human_behavior_selenium import natural_typing, before_search
 
 
 class CoupangHandlerSelenium:
@@ -21,15 +21,17 @@ class CoupangHandlerSelenium:
 
     BASE_URL = "https://www.coupang.com"
 
-    def __init__(self, driver):
+    def __init__(self, driver, network_mode: str = "Local"):
         """
         Args:
             driver: Selenium WebDriver 객체
+            network_mode: 네트워크 모드 ("Local", "VPN 0", "Proxy" 등)
         """
         self.driver = driver
         self.wait = WebDriverWait(driver, 30)
         self.status = ExecutionStatus.BROWSER_READY
         self.action_status = ActionStatus.INIT
+        self.network_mode = network_mode
 
     def navigate_to_home(self, video_recorder=None) -> bool:
         """
@@ -51,6 +53,9 @@ class CoupangHandlerSelenium:
 
             # 페이지 로딩 대기 (자동 녹화 중이므로 프레임 캡처 불필요)
             time.sleep(2)
+
+            # 네트워크 모드 오버레이 표시
+            self.show_network_mode_overlay()
 
             print("   ✓ Home page loaded")
             return True
@@ -80,6 +85,10 @@ class CoupangHandlerSelenium:
         self.action_status = ActionStatus.TYPING
 
         try:
+            # 검색 전 자연스러운 마우스 움직임 (Akamai 탐지 우회)
+            print("   🖱️  검색 전 마우스 움직임...")
+            before_search(self.driver)
+
             # JavaScript로 검색 실행
             search_script = """
             const keyword = arguments[0];
@@ -392,6 +401,60 @@ class CoupangHandlerSelenium:
             print(f"   ✗ Cart error: {e}")
             self.action_status = ActionStatus.ERROR_UNKNOWN
             return False
+
+    def show_network_mode_overlay(self):
+        """
+        브라우저 화면 중앙에 네트워크 모드 표시
+        (3초 후 자동 페이드 아웃)
+        """
+        try:
+            overlay_script = f"""
+            (function() {{
+                // 기존 오버레이 제거 (중복 방지)
+                const existing = document.getElementById('network-mode-overlay');
+                if (existing) {{
+                    existing.remove();
+                }}
+
+                // 오버레이 생성
+                const overlay = document.createElement('div');
+                overlay.id = 'network-mode-overlay';
+                overlay.textContent = '{self.network_mode}';
+
+                // 스타일 설정
+                overlay.style.cssText = `
+                    position: fixed;
+                    top: 50%;
+                    left: 50%;
+                    transform: translate(-50%, -50%);
+                    background-color: rgba(0, 0, 0, 0.8);
+                    color: white;
+                    font-size: 64px;
+                    font-weight: bold;
+                    padding: 40px 60px;
+                    border-radius: 20px;
+                    z-index: 999999;
+                    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+                    text-align: center;
+                    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+                    transition: opacity 0.5s ease-out;
+                `;
+
+                document.body.appendChild(overlay);
+
+                // 3초 후 페이드 아웃
+                setTimeout(() => {{
+                    overlay.style.opacity = '0';
+                    setTimeout(() => overlay.remove(), 500);
+                }}, 3000);
+            }})();
+            """
+
+            self.driver.execute_script(overlay_script)
+            print(f"   🌐 네트워크 모드 표시: {self.network_mode}")
+
+        except Exception as e:
+            print(f"   ⚠️  오버레이 표시 실패: {e}")
 
     def get_status(self) -> Dict:
         """현재 상태 반환"""

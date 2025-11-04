@@ -550,11 +550,11 @@ class ProductFinder:
                         inline: 'nearest'
                     });
                 """, element)
-                time.sleep(3.5)  # 썸네일 이미지 로드 대기 시간 증가 (1.5초 → 3.5초)
+                time.sleep(2)  # 썸네일 로드 기본 대기 (2초)
 
-            # 이미지 로드 완료 대기 (스크롤 후)
+            # 이미지 로드 완료 대기 (최대 3초, 실패해도 진행)
             print("   ⏳ 썸네일 이미지 로드 대기 중...")
-            self._wait_for_images_loaded(timeout=5)
+            self._wait_for_images_loaded(timeout=3)
 
             # 요소가 화면에 보이는지 확인
             is_visible = self.driver.execute_script("""
@@ -1044,17 +1044,21 @@ class ProductFinder:
         print(f"   검색 조건: product_id={product_id}, item_id={item_id}, vendor_item_id={vendor_item_id}")
         return (None, None)
 
-    def _wait_for_images_loaded(self, timeout: int = 5) -> bool:
+    def _wait_for_images_loaded(self, timeout: int = 3) -> bool:
         """
         뷰포트 내 모든 이미지 로드 완료 대기
 
         Args:
-            timeout: 최대 대기 시간 (초)
+            timeout: 최대 대기 시간 (초, 기본 3초)
 
         Returns:
             성공 여부 (True: 모든 이미지 로드 완료, False: 타임아웃 또는 일부 실패)
         """
         try:
+            # Selenium script timeout 설정 (무한 대기 방지)
+            original_timeout = self.driver.timeouts.script
+            self.driver.set_script_timeout(timeout + 1)  # JS timeout보다 1초 여유
+
             # JavaScript로 뷰포트 내 이미지 로드 상태 확인
             wait_script = """
             return new Promise((resolve) => {
@@ -1071,17 +1075,23 @@ class ProductFinder:
                                rect.right <= window.innerWidth;
                     });
 
+                    // 이미지가 없으면 바로 성공
+                    if (images.length === 0) {
+                        resolve({ success: true, count: 0 });
+                        return;
+                    }
+
                     // 모든 이미지 로드 완료 체크
                     const allLoaded = images.every(img => img.complete && img.naturalHeight > 0);
 
                     if (allLoaded) {
                         resolve({ success: true, count: images.length });
                     } else if (Date.now() - startTime > timeout) {
-                        // 타임아웃
+                        // 타임아웃: 일부만 로드되어도 진행
                         const pending = images.filter(img => !img.complete || img.naturalHeight === 0).length;
                         resolve({ success: false, count: images.length, pending: pending });
                     } else {
-                        // 재시도
+                        // 재시도 (100ms 간격)
                         setTimeout(checkImages, 100);
                     }
                 }
@@ -1092,18 +1102,20 @@ class ProductFinder:
 
             result = self.driver.execute_async_script(wait_script, timeout)
 
+            # 원래 timeout 복원
+            self.driver.set_script_timeout(original_timeout)
+
             if result['success']:
                 print(f"   ✅ {result['count']}개 이미지 로드 완료")
                 return True
             else:
-                print(f"   ⚠️  {result['pending']}/{result['count']}개 이미지 로드 지연 (타임아웃)")
+                print(f"   ⚠️  {result['pending']}/{result['count']}개 이미지 로드 지연 (계속 진행)")
                 # 일부 이미지가 로드되지 않아도 계속 진행
                 return False
 
         except Exception as e:
-            print(f"   ⚠️  이미지 로드 확인 실패: {e}")
-            # 폴백: 고정 1초 대기
-            time.sleep(1)
+            print(f"   ⚠️  이미지 로드 확인 실패: {e} (계속 진행)")
+            # 오류 발생 시에도 계속 진행
             return False
 
     def _trigger_lazy_images(self, container_element) -> None:

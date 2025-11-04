@@ -316,6 +316,22 @@ class BrowserCoreUC:
             else:
                 # 옵션 2 (기본): 프로필 유지
                 self.profile_dir.mkdir(parents=True, exist_ok=True)
+
+                # Chrome Lock 파일 제거 (프로필 재사용 시 충돌 방지)
+                lock_files = [
+                    self.profile_dir / "SingletonLock",
+                    self.profile_dir / "lockfile",
+                    self.profile_dir / "SingletonCookie",
+                    self.profile_dir / "SingletonSocket"
+                ]
+                for lock_file in lock_files:
+                    if lock_file.exists():
+                        try:
+                            lock_file.unlink()
+                            print(f"   🔓 Lock 파일 제거: {lock_file.name}")
+                        except:
+                            pass
+
                 print(f"✅ Profile directory ready")
         except Exception as e:
             print(f"   ❌ Failed to create profile directory: {e}")

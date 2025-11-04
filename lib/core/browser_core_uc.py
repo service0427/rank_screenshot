@@ -88,7 +88,26 @@ class BrowserCoreUC:
         # SOCKS5 프록시 설정 (인증 불필요)
         if proxy_address:
             options.add_argument(f"--proxy-server=socks5://{proxy_address}")
+
+            # Chrome 내부 서비스는 프록시 우회 (시작 크래시 방지)
+            bypass_list = [
+                "localhost",
+                "127.0.0.1",
+                "*.googleapis.com",
+                "*.gstatic.com",
+                "*.google.com",
+                "clients2.google.com",  # Chrome 업데이트
+                "update.googleapis.com"  # Chrome 컴포넌트
+            ]
+            options.add_argument(f"--proxy-bypass-list={';'.join(bypass_list)}")
+
+            # 프록시 사용 시 Chrome 시작 안정화 옵션
+            options.add_argument("--no-first-run")
+            options.add_argument("--disable-sync")
+            options.add_argument("--disable-default-apps")
+
             print(f"   🌐 SOCKS5 프록시 설정: {proxy_address}")
+            print(f"   ↪️  프록시 우회: Chrome 내부 서비스")
 
         # 네트워크 필터 (Chrome Extension - declarativeNetRequest)
         if enable_network_filter:

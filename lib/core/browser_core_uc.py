@@ -85,10 +85,19 @@ class BrowserCoreUC:
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-blink-features=AutomationControlled")
 
-        # SOCKS5 프록시 설정
+        # SOCKS5 프록시 설정 (인증 정보 포함)
         if proxy_address:
             options.add_argument(f"--proxy-server=socks5://{proxy_address}")
-            print(f"   🌐 SOCKS5 프록시 설정: {proxy_address}")
+
+            # 비밀번호 마스킹 처리 (로그 출력용)
+            display_address = proxy_address
+            if '@' in proxy_address:
+                auth_part, addr_part = proxy_address.split('@', 1)
+                if ':' in auth_part:
+                    user, _ = auth_part.split(':', 1)
+                    display_address = f"{user}:****@{addr_part}"
+
+            print(f"   🌐 SOCKS5 프록시 설정: {display_address}")
 
         # 네트워크 필터 (Chrome Extension - declarativeNetRequest)
         if enable_network_filter:
@@ -223,10 +232,17 @@ class BrowserCoreUC:
             version = random.choice(list(versions.keys()))
             chrome_path = versions[version]
 
-        # 버전별 + 사용자별 프로필 디렉토리 설정
-        # 각 사용자(tech, vpn0, vpn1...)가 자신의 홈 디렉토리에 독립 프로필 저장
-        # 소유권 충돌, /tmp 충돌, 리소스 공유 문제 완전 방지
-        profile_base = Config.get_profile_dir_base()  # 사용자별 독립 디렉토리
+        # 프로필 디렉토리 설정
+        # 프록시 사용 시: /tmp 사용 (권한 문제 없음, 간단함)
+        # VPN 사용 시: 사용자별 홈 디렉토리 사용 (사용자 격리)
+        if proxy_address:
+            # 프록시 사용: /tmp 디렉토리 (tech 사용자만 사용, 권한 간단)
+            profile_base = Path("/tmp/coupang_agent_proxy_profiles")
+            profile_base.mkdir(parents=True, exist_ok=True)
+        else:
+            # VPN 또는 로컬: 사용자별 홈 디렉토리
+            profile_base = Config.get_profile_dir_base()
+
         vpn_num = os.getenv('VPN_EXECUTED')
 
         # 각 Worker(instance)마다 별도 프로필 사용 (창 위치 독립 저장)
@@ -320,8 +336,9 @@ class BrowserCoreUC:
             proxy_address=proxy_address
         )
 
-        # Chrome 바이너리 경로 명시 (undetected-chromedriver가 시스템 Chrome 사용 방지)
-        options.binary_location = chrome_path
+        # Chrome 바이너리 경로 설정 (이중 보장)
+        # undetected-chromedriver 3.5.5에서 browser_executable_path만으로 부족할 수 있음
+        options.binary_location = str(chrome_path)
         print(f"   Chrome binary: {chrome_path}")
 
         # Major version 추출 (channels의 경우 MAJOR_VERSION 파일에서 읽기)

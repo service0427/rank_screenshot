@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Proxy API Client
-프록시 서버 API 연동 클라이언트
+프록시 서버 API 연동 클라이언트 (SOCKS5 인증 지원)
 """
 
 import requests
@@ -12,10 +12,14 @@ class ProxyAPIClient:
     """
     프록시 API 클라이언트
 
-    API 엔드포인트: https://mkt.techb.kr/api/proxy/status
+    API 엔드포인트: http://220.121.120.83/vpn_socks5/api/list.php?type=proxy
+    SOCKS5 인증: techb:Tech1324
+    응답 형식: ["IP1", "IP2", ...] (간소화된 IP 리스트)
     """
 
-    API_URL = "https://mkt.techb.kr/api/proxy/status"
+    API_URL = "http://220.121.120.83/vpn_socks5/api/list.php?type=proxy"
+    SOCKS5_USERNAME = "techb"
+    SOCKS5_PASSWORD = "Tech1324"
 
     def __init__(self, timeout: int = 10):
         """
@@ -24,19 +28,15 @@ class ProxyAPIClient:
         """
         self.timeout = timeout
 
-    def fetch_proxies(self) -> List[Dict]:
+    def fetch_proxies(self) -> List[str]:
         """
-        API에서 프록시 목록 가져오기
+        API에서 프록시 IP 목록 가져오기
 
         Returns:
-            프록시 정보 리스트
+            프록시 IP 문자열 리스트
             [
-                {
-                    "proxy": "112.161.54.7:10022",
-                    "external_ip": "112.161.54.7",
-                    "use_count": 0,
-                    "remaining_work_seconds": "168"
-                },
+                "211.198.89.191",
+                "175.210.218.228",
                 ...
             ]
 
@@ -47,12 +47,13 @@ class ProxyAPIClient:
             response = requests.get(self.API_URL, timeout=self.timeout)
             response.raise_for_status()
 
-            data = response.json()
+            # API 응답: IP 문자열 리스트
+            # 예: ["211.198.89.191", "175.210.218.228", ...]
+            proxies = response.json()
 
-            if not data.get('success'):
-                raise ValueError(f"API returned success=false: {data}")
+            if not isinstance(proxies, list):
+                raise ValueError(f"API 응답이 리스트가 아닙니다: {type(proxies)}")
 
-            proxies = data.get('proxies', [])
             print(f"   ✓ API에서 {len(proxies)}개 프록시 조회 완료")
 
             return proxies
@@ -64,45 +65,33 @@ class ProxyAPIClient:
         except ValueError as e:
             raise Exception(f"API 응답 파싱 실패: {e}")
 
-    def select_best_proxy(self, proxies: List[Dict]) -> str:
+    def select_best_proxy(self, proxies: List[str]) -> str:
         """
-        remaining_work_seconds > 120인 프록시 중 랜덤 선택
+        프록시 목록에서 랜덤 선택
 
         Args:
-            proxies: fetch_proxies()로 가져온 프록시 목록
+            proxies: fetch_proxies()로 가져온 프록시 IP 목록 (문자열 리스트)
 
         Returns:
-            프록시 주소 (IP:port 형식, 예: "112.161.54.7:10022")
+            프록시 주소 (인증 정보 포함, 예: "techb:Tech1324@211.198.89.191:10000")
 
         Raises:
-            ValueError: 프록시 목록이 비어있거나 조건 만족하는 프록시가 없을 때
+            ValueError: 프록시 목록이 비어있을 때
         """
         import random
 
         if not proxies:
             raise ValueError("사용 가능한 프록시가 없습니다")
 
-        # remaining_work_seconds > 120인 프록시만 필터링
-        valid_proxies = [
-            p for p in proxies
-            if int(p.get('remaining_work_seconds', 0)) > 120
-        ]
+        # 프록시 IP 중 랜덤 선택
+        public_ip = random.choice(proxies)
+        socks5_port = 10000  # 고정 포트
 
-        if not valid_proxies:
-            raise ValueError("remaining_work_seconds > 120인 프록시가 없습니다")
+        # 인증 정보 포함한 프록시 주소 생성
+        # 형식: "username:password@IP:port"
+        proxy_address = f"{self.SOCKS5_USERNAME}:{self.SOCKS5_PASSWORD}@{public_ip}:{socks5_port}"
 
-        # 필터링된 프록시 중 랜덤 선택
-        selected_proxy = random.choice(valid_proxies)
-        proxy_address = selected_proxy.get('proxy')
-        remaining_seconds = int(selected_proxy.get('remaining_work_seconds', 0))
-
-        if not proxy_address:
-            raise ValueError("프록시 주소가 없습니다")
-
-        # 초를 분으로 변환
-        remaining_minutes = remaining_seconds / 60
-
-        print(f"   ✓ 프록시 랜덤 선택: {proxy_address} (남은 시간: {remaining_minutes:.1f}분) [{len(valid_proxies)}개 중 선택]")
+        print(f"   ✓ 프록시 랜덤 선택: {public_ip}:{socks5_port} [{len(proxies)}개 중 선택]")
 
         return proxy_address
 
@@ -111,13 +100,19 @@ class ProxyAPIClient:
         프록시 주소 형식 검증
 
         Args:
-            proxy_address: 프록시 주소 (IP:port 형식)
+            proxy_address: 프록시 주소 (IP:port 또는 user:pass@IP:port 형식)
 
         Returns:
             유효 여부
         """
         if not proxy_address:
             return False
+
+        # 인증 정보 포함 형식: user:pass@IP:port
+        if '@' in proxy_address:
+            auth_part, addr_part = proxy_address.split('@', 1)
+            # auth_part 검증 생략 (user:pass 형식)
+            proxy_address = addr_part
 
         parts = proxy_address.split(':')
         if len(parts) != 2:
@@ -157,7 +152,7 @@ def get_proxy_address(proxy_arg: str = None) -> Optional[str]:
         proxy_arg: --proxy 옵션 값 ('auto' 또는 'IP:port')
 
     Returns:
-        프록시 주소 (IP:port 형식) 또는 None
+        프록시 주소 (인증 정보 포함, 예: "techb:Tech1324@IP:10000") 또는 None
     """
     if not proxy_arg:
         return None
@@ -177,6 +172,11 @@ def get_proxy_address(proxy_arg: str = None) -> Optional[str]:
         # 수동 지정
         print(f"🌐 프록시 수동 지정: {proxy_arg}")
         client = ProxyAPIClient()
+
+        # 인증 정보 없이 지정된 경우 자동 추가
+        if '@' not in proxy_arg:
+            proxy_arg = f"{client.SOCKS5_USERNAME}:{client.SOCKS5_PASSWORD}@{proxy_arg}"
+
         if not client.validate_proxy_format(proxy_arg):
             print(f"   ❌ 잘못된 프록시 형식: {proxy_arg} (올바른 형식: IP:port)")
             return None

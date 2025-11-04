@@ -446,9 +446,10 @@ class BrowserCoreUC:
         print(f"   ✓ Anti-detection: ENABLED by default")
 
         # 프로필 재사용 시 쿠키/세션/로컬스토리지 삭제
+        # 프록시 사용 시 쿠팡 도메인 이동 건너뛰기 (프록시 차단으로 Chrome crash 방지)
         if use_profile and not fresh_profile:
             print()  # 빈 줄
-            self.clear_all_storage()
+            self.clear_all_storage(skip_navigation=bool(proxy_address))
 
         return self.driver
 
@@ -519,8 +520,13 @@ class BrowserCoreUC:
         except Exception as e:
             print(f"   ⚠️  Local storage clear failed: {e}")
 
-    def clear_all_storage(self):
-        """쿠키, 세션 스토리지, 로컬 스토리지 모두 삭제 (캐시는 유지)"""
+    def clear_all_storage(self, skip_navigation: bool = False):
+        """
+        쿠키, 세션 스토리지, 로컬 스토리지 모두 삭제 (캐시는 유지)
+
+        Args:
+            skip_navigation: True이면 쿠팡 도메인 이동 건너뛰기 (프록시 사용 시)
+        """
         if not self.driver:
             return
 
@@ -530,12 +536,14 @@ class BrowserCoreUC:
             # 현재 URL 확인
             current_url = self.driver.current_url
 
-            # 쿠팡 도메인이 아니면 쿠팡으로 이동
-            if "coupang.com" not in current_url:
+            # 쿠팡 도메인이 아니면 쿠팡으로 이동 (skip_navigation=False일 때만)
+            if not skip_navigation and "coupang.com" not in current_url:
                 print("   ℹ️  쿠팡 도메인으로 이동 중...")
                 self.driver.get("https://www.coupang.com")
                 import time
                 time.sleep(1)
+            elif skip_navigation:
+                print("   ℹ️  쿠팡 도메인 이동 건너뜀 (프록시 사용)")
 
             # 쿠키 삭제
             self.driver.delete_all_cookies()

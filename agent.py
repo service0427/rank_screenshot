@@ -18,7 +18,10 @@ from lib.modules.coupang_handler_selenium import CoupangHandlerSelenium
 from lib.modules.product_finder import ProductFinder
 from lib.modules.screenshot_processor import ScreenshotProcessor
 from lib.modules.work_api_client import WorkAPIClient
+from lib.modules.vpn_api_client import VPNAPIClient
+from lib.modules.proxy_api_client import ProxyAPIClient
 from lib.workflows.search_workflow import SearchWorkflow
+from lib.utils.network_validator import verify_vpn_connection, verify_proxy_connection, print_verification_result
 
 # 마지막 사용 버전 저장 파일
 LAST_VERSION_FILE = Path(__file__).parent / ".last_version"
@@ -232,6 +235,67 @@ def run_agent_selenium_uc(
             if current_user.startswith('vpn'):
                 vpn_num = current_user[3:]  # "vpn0" -> "0"
                 network_mode = f"VPN {vpn_num}"
+
+        # === 4-1. VPN/Proxy 연결 검증 (패킷 방식) ===
+        if proxy_address or (network_mode.startswith("VPN") and network_mode != "Local"):
+            print("\n" + "=" * 60)
+            print("🔐 네트워크 연결 검증 (패킷 방식)")
+            print("=" * 60)
+
+            verification_passed = False
+
+            if proxy_address:
+                # Proxy 모드 검증
+                try:
+                    proxy_client = ProxyAPIClient()
+                    # IP 주소 추출 (예: "1.2.3.4:10000" -> "1.2.3.4")
+                    expected_ip = proxy_address.split(':')[0]
+
+                    result = verify_proxy_connection(
+                        proxy_address=proxy_address,
+                        expected_ip=expected_ip,
+                        timeout=10
+                    )
+                    verification_passed = print_verification_result(result, mode="Proxy")
+
+                except Exception as e:
+                    print(f"   ❌ Proxy 검증 중 오류: {e}")
+                    verification_passed = False
+
+            else:
+                # VPN 모드 검증
+                try:
+                    vpn_num_str = network_mode.split(' ')[1]  # "VPN 0" -> "0"
+                    vpn_num = int(vpn_num_str)
+
+                    vpn_client = VPNAPIClient()
+                    result = verify_vpn_connection(
+                        vpn_number=vpn_num,
+                        vpn_client=vpn_client,
+                        timeout=10
+                    )
+                    verification_passed = print_verification_result(result, mode=f"VPN {vpn_num}")
+
+                except Exception as e:
+                    print(f"   ❌ VPN 검증 중 오류: {e}")
+                    verification_passed = False
+
+            # 검증 실패 시 즉시 종료
+            if not verification_passed:
+                print("\n" + "=" * 60)
+                print("🚨 네트워크 연결 검증 실패!")
+                print("=" * 60)
+                print("   VPN/Proxy가 올바르게 작동하지 않습니다.")
+                print("   쿠팡 접속을 중단하고 종료합니다.")
+                print("=" * 60 + "\n")
+
+                # 브라우저 종료
+                if core and hasattr(core, 'close_browser'):
+                    core.close_browser()
+
+                return  # Agent 종료
+
+            print("   ✅ 네트워크 연결 검증 통과! 쿠팡 접속을 시작합니다.\n")
 
         # === 5. 모듈 초기화 ===
         handler = CoupangHandlerSelenium(driver, network_mode=network_mode)

@@ -35,7 +35,7 @@ class CoupangHandlerSelenium:
 
     def navigate_to_home(self, video_recorder=None) -> bool:
         """
-        쿠팡 홈페이지로 이동
+        쿠팡 홈페이지로 이동 (20초 타임아웃)
 
         Args:
             video_recorder: 영상 녹화 객체 (선택)
@@ -48,6 +48,9 @@ class CoupangHandlerSelenium:
         self.action_status = ActionStatus.NAVIGATING
 
         try:
+            # 페이지 로드 타임아웃 설정 (20초)
+            self.driver.set_page_load_timeout(20)
+
             self.driver.get(self.BASE_URL)
             self.action_status = ActionStatus.LOADED
 
@@ -61,7 +64,8 @@ class CoupangHandlerSelenium:
             return True
 
         except TimeoutException:
-            print("   ✗ Timeout loading home page")
+            print("   ✗ Timeout loading home page (20초 초과)")
+            print("   🚨 쿠팡 홈페이지 무한 로딩 감지 - 강제 종료")
             self.action_status = ActionStatus.ERROR_TIMEOUT
             return False
         except Exception as e:

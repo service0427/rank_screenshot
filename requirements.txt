@@ -11,5 +11,8 @@ Pillow>=10.0.0
 # HTTP client
 requests>=2.31.0
 
+# SOCKS5 proxy support (for requests)
+pysocks>=1.7.1
+
 # Process management
 psutil>=5.9.0

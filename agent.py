@@ -222,14 +222,21 @@ def run_agent_selenium_uc(
 
         # === 4. 네트워크 모드 결정 ===
         network_mode = "Local"
-        # VPN 사용자인지 확인 (vpn0, vpn1, ... 형식)
+        # VPN 사용자인지 확인 (vpn0, vpn1, ... 형식 vs vpn-worker-N)
         current_user = os.getenv('USER', '')
-        if current_user.startswith('vpn'):
+        is_vpn_pool_worker = current_user.startswith('vpn-worker-')
+
+        if current_user.startswith('vpn') and not is_vpn_pool_worker:
             vpn_num = current_user[3:]  # "vpn0" -> "0"
             network_mode = f"VPN {vpn_num}"
+        elif is_vpn_pool_worker:
+            # VPN 키 풀 워커 (WireGuard 외부에서 관리됨)
+            worker_id = current_user.split('-')[-1]  # "vpn-worker-1" -> "1"
+            network_mode = f"VPN Pool (Worker {worker_id})"
 
         # === 4-1. VPN 연결 검증 (패킷 방식) ===
-        if network_mode.startswith("VPN") and network_mode != "Local":
+        # ⚠️ VPN 키 풀 워커는 검증 건너뛰기 (외부에서 WireGuard 관리)
+        if network_mode.startswith("VPN") and network_mode != "Local" and not is_vpn_pool_worker:
             print("\n" + "=" * 60)
             print("🔐 네트워크 연결 검증 (패킷 방식)")
             print("=" * 60)

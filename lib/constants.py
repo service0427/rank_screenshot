@@ -192,10 +192,15 @@ class Config:
 
         # 현재 사용자의 홈 디렉토리 확인
         user = os.getenv('USER', 'unknown')
-        home_dir = Path.home()
 
-        # 홈 디렉토리에 .coupang_agent_profiles 생성
-        profile_base = home_dir / ".coupang_agent_profiles"
+        # VPN 워커 사용자(vpn-worker-N)의 경우 /tmp 사용
+        if user.startswith('vpn-worker-'):
+            profile_base = Path("/tmp") / ".coupang_agent_profiles" / user
+        else:
+            home_dir = Path.home()
+            profile_base = home_dir / ".coupang_agent_profiles"
+
+        # 디렉토리 생성
         profile_base.mkdir(parents=True, exist_ok=True)
 
         return str(profile_base)

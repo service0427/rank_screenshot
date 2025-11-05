@@ -412,13 +412,21 @@ for i in {1..12}; do
 
     # 사용자 생성 (이미 존재하면 스킵)
     if ! id "$username" &>/dev/null; then
-        sudo useradd -u $uid -M -s /bin/bash "$username" 2>/dev/null
+        # ⚠️ -m 옵션으로 홈 디렉토리 생성 (agent.py가 ~/.coupang_agent_profiles 사용)
+        sudo useradd -u $uid -m -s /bin/bash "$username" 2>/dev/null
         if [ $? -eq 0 ]; then
             ((WORKERS_CREATED++))
             log_info "  ✓ 사용자 생성: $username (UID $uid)"
         fi
     else
         log_info "  ⊙ 사용자 존재: $username (UID $uid)"
+        # 홈 디렉토리가 없으면 생성
+        if [ ! -d "/home/$username" ]; then
+            sudo mkdir -p "/home/$username"
+            sudo chown $username:$username "/home/$username"
+            sudo chmod 755 "/home/$username"
+            log_info "  ✓ 홈 디렉토리 생성: /home/$username"
+        fi
     fi
 
     # 정책 라우팅 규칙 추가 (중복 확인)

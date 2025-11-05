@@ -664,11 +664,13 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
             # ⚠️ VPN 키 풀 사용 시:
             #    1. --vpn 옵션 제거 (네트워크 계층에서 이미 VPN 연결됨)
             #    2. sudo -u vpn-worker-N으로 실행 (정책 라우팅 적용)
+            #    3. env HOME=/tmp DISPLAY=:0 설정 (Chrome/X11용)
             if use_vpn and vpn_conn:
-                # VPN 키 풀: sudo -u vpn-worker-N python3 agent.py ...
+                # VPN 키 풀: sudo -u vpn-worker-N env HOME=/tmp DISPLAY=:0 python3 agent.py ...
                 vpn_user = f"vpn-worker-{worker_id}"
                 cmd = [
                     "sudo", "-u", vpn_user,
+                    "env", "HOME=/tmp", "DISPLAY=:0",
                     "python3", "agent.py",
                     "--work-api",
                     "--version", selected_version,

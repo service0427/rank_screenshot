@@ -950,12 +950,19 @@ def main():
     elif args.adjust2:
         adjust_mode = "adjust2"
 
-    # VPN 목록 조회
-    print("🔍 VPN 목록 조회 중...")
+    # VPN 모드 결정 (VPN 키 풀 또는 Local)
+    print("🔍 VPN 키 풀 API 확인 중...")
     try:
         vpn_client = VPNAPIClient()
-        vpn_list = vpn_client.get_vpn_list_with_local()
-        print(f"   ✓ VPN {len(vpn_list) - 1}개 + Local 감지 (총 {len(vpn_list)}개)")
+        servers = vpn_client.get_server_list()
+        if servers and len(servers) > 0:
+            # 🧪 테스트: Local 모드 강제 (VPN 키 풀 비활성화)
+            print(f"   ✓ VPN 키 풀 사용 가능 (서버 {len(servers)}개)")
+            print(f"   🧪 테스트: Local 모드로 강제 실행")
+            vpn_list = ['L']
+        else:
+            print(f"   ⚠️  VPN 서버 없음 - Local 모드 사용")
+            vpn_list = ['L']
     except Exception as e:
         print(f"   ⚠️  VPN API 조회 실패: {e}")
         print(f"   ⚠️  Local 모드만 사용합니다")
@@ -980,19 +987,13 @@ def main():
     else:
         print(f"반복 횟수: {args.iterations} (스레드당)")
         print(f"총 작업 수: {args.threads * args.iterations}")
-    if vpn_list:
-        # 'L'을 "Local"로 변환하여 표시
-        display_list = []
-        for v in vpn_list:
-            if v == 'L':
-                display_list.append("Local")
-            else:
-                display_list.append(f"VPN-{v}")
-        print(f"네트워크 모드: {', '.join(display_list[:10])}", end='')
-        if len(vpn_list) > 10:
-            print(f" ... 외 {len(vpn_list) - 10}개 (랜덤 선택, 동시 할당 제한)")
-        else:
-            print(f" (랜덤 선택, 동시 할당 제한)")
+    # 네트워크 모드 표시
+    if vpn_list == True:
+        print(f"네트워크 모드: VPN 키 풀 (동적 할당)")
+    elif vpn_list == ['L']:
+        print(f"네트워크 모드: Local (VPN 없음)")
+    else:
+        print(f"네트워크 모드: {vpn_list}")
     if adjust_mode:
         print(f"Adjust 모드: {adjust_mode}")
     print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")

@@ -469,10 +469,10 @@ class BrowserCoreUC:
         print(f"   ✓ Anti-detection: ENABLED by default")
 
         # 프로필 재사용 시 쿠키/세션/로컬스토리지 삭제
-        # 프록시 사용 시 쿠팡 도메인 이동 건너뛰기 (프록시 차단으로 Chrome crash 방지)
+        # (VPN 키 풀 사용 시에도 정상적으로 쿠팡 도메인 이동)
         if use_profile and not fresh_profile:
             print()  # 빈 줄
-            self.clear_all_storage(skip_navigation=bool(proxy_address))
+            self.clear_all_storage(skip_navigation=False)
 
         return self.driver
 

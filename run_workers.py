@@ -16,8 +16,6 @@ from pathlib import Path
 
 # VPN API 클라이언트
 from lib.modules.vpn_api_client import VPNAPIClient
-# SOCKS5 프록시 API 클라이언트
-from lib.modules.proxy_api_client import ProxyAPIClient
 
 
 # ============================================================
@@ -529,7 +527,7 @@ def calculate_window_position(worker_id: int, window_width: int = None, window_h
     }
 
 
-def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode: str = None, vpn_list: list = None, window_config: dict = None, blocked_manager: BlockedCombinationsManager = None, vpn_allocation_manager: VPNAllocationManager = None, use_socks5: bool = False, socks5_client: ProxyAPIClient = None):
+def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode: str = None, vpn_list: list = None, window_config: dict = None, blocked_manager: BlockedCombinationsManager = None, vpn_allocation_manager: VPNAllocationManager = None):
     """
     개별 워커 실행
 
@@ -538,12 +536,10 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
         iterations: 반복 횟수 (None이면 무한 루프)
         stats: 통계 객체
         adjust_mode: Adjust 모드 ("adjust", "adjust2", None)
-        vpn_list: VPN/SOCKS5 번호 리스트 (None: 사용 안 함, ['L', '0', '1'] 등)
+        vpn_list: VPN 번호 리스트 (None: 사용 안 함, ['L', '0', '1'] 등)
         window_config: 창 설정 (width, height, x, y)
-        blocked_manager: 차단 조합 관리자 (VPN/SOCKS5 + Chrome 버전 조합 차단 관리)
-        vpn_allocation_manager: VPN/SOCKS5 동시 할당 관리자 (중복 사용 방지)
-        use_socks5: SOCKS5 프록시 사용 여부 (True: SOCKS5, False: VPN)
-        socks5_client: SOCKS5 API 클라이언트 (use_socks5=True일 때 필수)
+        blocked_manager: 차단 조합 관리자 (VPN + Chrome 버전 조합 차단 관리)
+        vpn_allocation_manager: VPN 동시 할당 관리자 (중복 사용 방지)
     """
     if iterations is None:
         print(f"[Worker-{worker_id}] 시작 - 무한 루프 (instance_id={worker_id})")
@@ -638,11 +634,10 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                     selected_version = "random"
 
             # 작업 시작 메시지
-            mode_label = "SOCKS5" if use_socks5 else "VPN"
             if selected_vpn == 'L':
                 vpn_str = "Local"
             elif selected_vpn:
-                vpn_str = f"{mode_label}: {selected_vpn}"
+                vpn_str = f"VPN: {selected_vpn}"
             else:
                 vpn_str = ""
 
@@ -658,7 +653,7 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                 if selected_vpn == 'L':
                     vpn_display = "Local"
                 else:
-                    vpn_display = f"{mode_label} {selected_vpn}"
+                    vpn_display = f"VPN {selected_vpn}"
                 print(f"   ⚠️  차단된 Chrome 버전 건너뜀 ({vpn_display})")
                 for ver, remaining in blocked_versions:
                     print(f"      - Chrome {ver}: {remaining // 60}분 {remaining % 60}초 남음")
@@ -671,19 +666,9 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                 "--version", selected_version,
             ]
 
-            # VPN 또는 SOCKS5 옵션 추가
+            # VPN 옵션 추가
             if selected_vpn and selected_vpn != 'L':
-                if use_socks5:
-                    # SOCKS5 프록시 사용
-                    socks5_ip = socks5_client.get_ip_by_socks5_number(int(selected_vpn))
-                    if socks5_ip:
-                        proxy_address = f"{socks5_ip}:{socks5_client.SOCKS5_PORT}"
-                        cmd.extend(["--proxy", proxy_address])
-                    else:
-                        print(f"   ⚠️  SOCKS5 {selected_vpn} IP 조회 실패, Local로 실행")
-                else:
-                    # VPN 사용
-                    cmd.extend(["--vpn", str(selected_vpn)])
+                cmd.extend(["--vpn", str(selected_vpn)])
 
             # Adjust 모드 옵션 추가 (선택 사항)
             if adjust_mode == "adjust":
@@ -877,17 +862,9 @@ def main():
   9  10  11  12
 
 네트워크 모드:
-  [VPN 모드 - 기본]
   - VPN 목록은 API에서 자동 조회 (http://220.121.120.83/vpn_socks5/api/list.php)
   - Local + VPN 0~N (API에서 가져온 IP 개수만큼)
   - 각 VPN은 동시에 1개 워커만 사용 (동시 할당 제한)
-
-  [SOCKS5 모드 - --use-socks5]
-  - SOCKS5 목록은 API에서 자동 조회 (http://techb.kr/vpn_socks5/api/list.php?type=proxy)
-  - Local + SOCKS5 0~N (API에서 가져온 IP 개수만큼)
-  - 각 SOCKS5는 동시에 1개 워커만 사용 (동시 할당 제한)
-  - 포트: 10000 (공통)
-  - 권한 문제 없음 (tech 사용자로 실행)
 
 차단 조합 관리:
   - http2 차단 발생 시 VPN+Chrome 버전 조합을 자동으로 차단 목록에 추가
@@ -937,11 +914,6 @@ def main():
         help="창 높이 (기본: 1200px)"
     )
 
-    parser.add_argument(
-        "--use-socks5",
-        action="store_true",
-        help="VPN 대신 SOCKS5 프록시 사용 (권한 문제 해결, tech 사용자로 실행)"
-    )
 
     args = parser.parse_args()
 
@@ -971,29 +943,16 @@ def main():
     elif args.adjust2:
         adjust_mode = "adjust2"
 
-    # VPN 또는 SOCKS5 목록 조회
-    if args.use_socks5:
-        # SOCKS5 프록시 사용
-        print("🔍 SOCKS5 프록시 목록 조회 중...")
-        try:
-            socks5_client = ProxyAPIClient()
-            vpn_list = socks5_client.get_socks5_list_with_local()
-            print(f"   ✓ SOCKS5 {len(vpn_list) - 1}개 + Local 감지 (총 {len(vpn_list)}개)")
-        except Exception as e:
-            print(f"   ⚠️  SOCKS5 API 조회 실패: {e}")
-            print(f"   ⚠️  Local 모드만 사용합니다")
-            vpn_list = ['L']
-    else:
-        # VPN 사용 (기본)
-        print("🔍 VPN 목록 조회 중...")
-        try:
-            vpn_client = VPNAPIClient()
-            vpn_list = vpn_client.get_vpn_list_with_local()
-            print(f"   ✓ VPN {len(vpn_list) - 1}개 + Local 감지 (총 {len(vpn_list)}개)")
-        except Exception as e:
-            print(f"   ⚠️  VPN API 조회 실패: {e}")
-            print(f"   ⚠️  Local 모드만 사용합니다")
-            vpn_list = ['L']
+    # VPN 목록 조회
+    print("🔍 VPN 목록 조회 중...")
+    try:
+        vpn_client = VPNAPIClient()
+        vpn_list = vpn_client.get_vpn_list_with_local()
+        print(f"   ✓ VPN {len(vpn_list) - 1}개 + Local 감지 (총 {len(vpn_list)}개)")
+    except Exception as e:
+        print(f"   ⚠️  VPN API 조회 실패: {e}")
+        print(f"   ⚠️  Local 모드만 사용합니다")
+        vpn_list = ['L']
 
     # VPN 동시 할당 관리자 생성
     vpn_allocation_manager = VPNAllocationManager()
@@ -1017,12 +976,11 @@ def main():
     if vpn_list:
         # 'L'을 "Local"로 변환하여 표시
         display_list = []
-        mode_label = "SOCKS5" if args.use_socks5 else "VPN"
         for v in vpn_list:
             if v == 'L':
                 display_list.append("Local")
             else:
-                display_list.append(f"{mode_label}-{v}")
+                display_list.append(f"VPN-{v}")
         print(f"네트워크 모드: {', '.join(display_list[:10])}", end='')
         if len(vpn_list) > 10:
             print(f" ... 외 {len(vpn_list) - 10}개 (랜덤 선택, 동시 할당 제한)")
@@ -1067,7 +1025,7 @@ def main():
 
         thread = threading.Thread(
             target=run_worker,
-            args=(worker_id, args.iterations, stats, adjust_mode, vpn_list, window_config, blocked_manager, vpn_allocation_manager, args.use_socks5, socks5_client if args.use_socks5 else None),
+            args=(worker_id, args.iterations, stats, adjust_mode, vpn_list, window_config, blocked_manager, vpn_allocation_manager),
             name=f"Worker-{worker_id}"
         )
         threads.append(thread)

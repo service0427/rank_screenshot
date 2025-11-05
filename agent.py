@@ -19,9 +19,8 @@ from lib.modules.product_finder import ProductFinder
 from lib.modules.screenshot_processor import ScreenshotProcessor
 from lib.modules.work_api_client import WorkAPIClient
 from lib.modules.vpn_api_client import VPNAPIClient
-from lib.modules.proxy_api_client import ProxyAPIClient
 from lib.workflows.search_workflow import SearchWorkflow
-from lib.utils.network_validator import verify_vpn_connection, verify_proxy_connection, print_verification_result
+from lib.utils.network_validator import verify_vpn_connection, print_verification_result
 
 # 마지막 사용 버전 저장 파일
 LAST_VERSION_FILE = Path(__file__).parent / ".last_version"
@@ -122,8 +121,7 @@ def run_agent_selenium_uc(
     enable_rank_adjust: bool = False,  # Adjust 모드 (미래 개발용)
     adjust_mode: str = None,  # "adjust" 또는 "adjust2" (미래 개발용)
     min_rank: int = None,  # Adjust 모드용 최소 순위 (미래 개발용)
-    enable_main_filter: bool = False,
-    proxy_address: str = None  # SOCKS5 프록시 주소
+    enable_main_filter: bool = False
 ):
     """
     Selenium + undetected-chromedriver 에이전트 실행 (리팩토링 버전)
@@ -157,8 +155,6 @@ def run_agent_selenium_uc(
     vpn_num = os.environ.get('VPN_EXECUTED')
     if vpn_num is not None:
         print(f"🌐 VPN: ✅ wg{vpn_num}/vpn{vpn_num} (Enabled)")
-    elif proxy_address:
-        print(f"🌐 Proxy: ✅ SOCKS5 {proxy_address}")
     else:
         print(f"🌐 Network: ❌ Local IP (Direct)")
     print("=" * 60 + "\n")
@@ -177,8 +173,7 @@ def run_agent_selenium_uc(
             window_height=window_height,
             enable_network_filter=enable_main_filter,
             window_x=window_x,
-            window_y=window_y,
-            proxy_address=proxy_address
+            window_y=window_y
         )
         if not driver:
             print("❌ Failed to launch browser")
@@ -227,65 +222,43 @@ def run_agent_selenium_uc(
 
         # === 4. 네트워크 모드 결정 ===
         network_mode = "Local"
-        if proxy_address:
-            network_mode = f"Proxy {proxy_address}"
-        else:
-            # VPN 사용자인지 확인 (vpn0, vpn1, ... 형식)
-            current_user = os.getenv('USER', '')
-            if current_user.startswith('vpn'):
-                vpn_num = current_user[3:]  # "vpn0" -> "0"
-                network_mode = f"VPN {vpn_num}"
+        # VPN 사용자인지 확인 (vpn0, vpn1, ... 형식)
+        current_user = os.getenv('USER', '')
+        if current_user.startswith('vpn'):
+            vpn_num = current_user[3:]  # "vpn0" -> "0"
+            network_mode = f"VPN {vpn_num}"
 
-        # === 4-1. VPN/Proxy 연결 검증 (패킷 방식) ===
-        if proxy_address or (network_mode.startswith("VPN") and network_mode != "Local"):
+        # === 4-1. VPN 연결 검증 (패킷 방식) ===
+        if network_mode.startswith("VPN") and network_mode != "Local":
             print("\n" + "=" * 60)
             print("🔐 네트워크 연결 검증 (패킷 방식)")
             print("=" * 60)
 
             verification_passed = False
 
-            if proxy_address:
-                # Proxy 모드 검증
-                try:
-                    proxy_client = ProxyAPIClient()
-                    # IP 주소 추출 (예: "1.2.3.4:10000" -> "1.2.3.4")
-                    expected_ip = proxy_address.split(':')[0]
+            # VPN 모드 검증
+            try:
+                vpn_num_str = network_mode.split(' ')[1]  # "VPN 0" -> "0"
+                vpn_num = int(vpn_num_str)
 
-                    result = verify_proxy_connection(
-                        proxy_address=proxy_address,
-                        expected_ip=expected_ip,
-                        timeout=10
-                    )
-                    verification_passed = print_verification_result(result, mode="Proxy")
+                vpn_client = VPNAPIClient()
+                result = verify_vpn_connection(
+                    vpn_number=vpn_num,
+                    vpn_client=vpn_client,
+                    timeout=10
+                )
+                verification_passed = print_verification_result(result, mode=f"VPN {vpn_num}")
 
-                except Exception as e:
-                    print(f"   ❌ Proxy 검증 중 오류: {e}")
-                    verification_passed = False
-
-            else:
-                # VPN 모드 검증
-                try:
-                    vpn_num_str = network_mode.split(' ')[1]  # "VPN 0" -> "0"
-                    vpn_num = int(vpn_num_str)
-
-                    vpn_client = VPNAPIClient()
-                    result = verify_vpn_connection(
-                        vpn_number=vpn_num,
-                        vpn_client=vpn_client,
-                        timeout=10
-                    )
-                    verification_passed = print_verification_result(result, mode=f"VPN {vpn_num}")
-
-                except Exception as e:
-                    print(f"   ❌ VPN 검증 중 오류: {e}")
-                    verification_passed = False
+            except Exception as e:
+                print(f"   ❌ VPN 검증 중 오류: {e}")
+                verification_passed = False
 
             # 검증 실패 시 즉시 종료
             if not verification_passed:
                 print("\n" + "=" * 60)
                 print("🚨 네트워크 연결 검증 실패!")
                 print("=" * 60)
-                print("   VPN/Proxy가 올바르게 작동하지 않습니다.")
+                print("   VPN이 올바르게 작동하지 않습니다.")
                 print("   쿠팡 접속을 중단하고 종료합니다.")
                 print("=" * 60 + "\n")
 
@@ -501,8 +474,7 @@ def run_work_api_mode(
     enable_rank_adjust: bool = False,
     adjust_mode: str = None,
     enable_main_filter: bool = False,
-    specified_screenshot_id: int = None,
-    proxy_address: str = None
+    specified_screenshot_id: int = None
 ):
     """
     작업 API 모드 실행
@@ -577,8 +549,7 @@ def run_work_api_mode(
         enable_rank_adjust=enable_rank_adjust,
         adjust_mode=adjust_mode,
         min_rank=min_rank,
-        enable_main_filter=enable_main_filter,
-        proxy_address=proxy_address
+        enable_main_filter=enable_main_filter
     )
 
     return success
@@ -724,15 +695,6 @@ Examples:
         default=None,
         metavar="N",
         help="VPN server number (0=wg0/vpn0, 1=wg1/vpn1, etc.)"
-    )
-
-    core_group.add_argument(
-        "--proxy",
-        nargs="?",
-        const="auto",
-        default=None,
-        metavar="ADDR",
-        help="SOCKS5 proxy (no value=auto select from API, value=manual specify like 123.123.123.123:10001)"
     )
 
     core_group.add_argument(
@@ -906,21 +868,6 @@ Examples:
             return
         print("=" * 60 + "\n")
 
-    # === VPN과 Proxy 배타적 체크 ===
-    if args.vpn is not None and args.proxy:
-        print("❌ Error: --vpn과 --proxy는 동시 사용 불가")
-        print("   Local / VPN / Proxy 중 하나만 선택하세요")
-        return
-
-    # === Proxy 주소 가져오기 ===
-    proxy_address = None
-    if args.proxy:
-        from lib.modules.proxy_api_client import get_proxy_address
-        proxy_address = get_proxy_address(args.proxy)
-        if not proxy_address:
-            print("❌ Error: 프록시 주소를 가져올 수 없습니다")
-            return
-
     # === VPN 재실행 로직 ===
     if args.vpn is not None:
         if not os.environ.get('VPN_EXECUTED'):
@@ -1004,8 +951,7 @@ Examples:
             enable_rank_adjust=args.adjust,
             adjust_mode="adjust" if args.adjust else None,
             enable_main_filter=args.enable_main_filter,
-            specified_screenshot_id=specified_screenshot_id,
-            proxy_address=proxy_address
+            specified_screenshot_id=specified_screenshot_id
         )
         sys.exit(0 if success else 1)
 
@@ -1043,8 +989,7 @@ Examples:
         window_y=args.window_y,
         enable_rank_adjust=args.adjust,
         adjust_mode="adjust" if args.adjust else None,
-        enable_main_filter=args.enable_main_filter,
-        proxy_address=proxy_address
+        enable_main_filter=args.enable_main_filter
     )
 
 

@@ -309,6 +309,71 @@ def cleanup_chrome_processes(vpn=None, instance_id=None):
         print(f"   ⚠️  Chrome 프로세스 정리 실패: {e}")
 
 
+def cleanup_vpn_interface(worker_id: int) -> bool:
+    """
+    워커 ID에 해당하는 VPN 인터페이스 정리 (강제 종료로 남은 인터페이스 제거)
+
+    Args:
+        worker_id: 워커 ID (1~12)
+
+    Returns:
+        정리 성공 여부
+    """
+    interface_name = f"wg-worker-{worker_id}"
+
+    try:
+        # 1. 인터페이스 존재 확인
+        result = subprocess.run(
+            ['ip', 'link', 'show', interface_name],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode != 0:
+            # 인터페이스 없음 (정상)
+            return True
+
+        print(f"   🧹 기존 VPN 인터페이스 발견: {interface_name}")
+
+        # 2. wg-quick down 시도 (설정 파일이 있으면)
+        config_path = Path(f"/tmp/vpn_configs/{interface_name}.conf")
+        if config_path.exists():
+            result = subprocess.run(
+                ['sudo', 'wg-quick', 'down', str(config_path)],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            if result.returncode == 0:
+                print(f"   ✅ wg-quick down 성공: {interface_name}")
+                # 설정 파일 삭제
+                try:
+                    config_path.unlink()
+                except Exception:
+                    pass
+                return True
+
+        # 3. 직접 인터페이스 삭제 (wg-quick 실패 시)
+        result = subprocess.run(
+            ['sudo', 'ip', 'link', 'del', interface_name],
+            capture_output=True,
+            text=True,
+            timeout=5
+        )
+
+        if result.returncode == 0:
+            print(f"   ✅ VPN 인터페이스 삭제: {interface_name}")
+            return True
+        else:
+            print(f"   ⚠️  VPN 인터페이스 삭제 실패: {result.stderr}")
+            return False
+
+    except Exception as e:
+        print(f"   ⚠️  VPN 정리 중 오류: {e}")
+        return False
+
+
 # ============================================================
 # 창 위치 및 크기 설정 (워커별 수동 지정)
 # ============================================================
@@ -596,6 +661,8 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
 
             # VPN 키 풀 연결 (use_vpn=True인 경우)
             if use_vpn and vpn_client:
+                # 이전 작업의 강제 종료로 남은 VPN 인터페이스 정리
+                cleanup_vpn_interface(worker_id)
                 print(f"\n[Worker-{worker_id}] 작업 {iteration_str}")
                 print("=" * 60)
                 vpn_conn = VPNConnection(worker_id=worker_id, vpn_client=vpn_client)

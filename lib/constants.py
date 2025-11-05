@@ -193,10 +193,14 @@ class Config:
         # 현재 사용자의 홈 디렉토리 확인
         user = os.getenv('USER', 'unknown')
 
-        # VPN 워커 사용자(vpn-worker-N)의 경우 /tmp 사용
+        # VPN 워커 사용자(vpn-worker-N)의 경우 프로젝트 디렉토리 사용
         if user.startswith('vpn-worker-'):
-            profile_base = Path("/tmp") / ".coupang_agent_profiles" / user
+            # 프로젝트 root 디렉토리의 browser-profiles 사용
+            # (vpn-worker-N은 홈 디렉토리가 없거나 접근 권한이 없을 수 있음)
+            project_root = Path(__file__).parent.parent
+            profile_base = project_root / "browser-profiles" / f"vpn-worker-{user.split('-')[-1]}"
         else:
+            # 일반 사용자는 홈 디렉토리 사용
             home_dir = Path.home()
             profile_base = home_dir / ".coupang_agent_profiles"
 

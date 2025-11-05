@@ -223,8 +223,35 @@ class VPNConnection:
             if not self.vpn_key_data:
                 return False
 
-            # 2. WireGuard 설정 파일 생성
+            # 2. WireGuard 설정 파일 생성 (정책 라우팅 적용)
             config_content = self.vpn_key_data['config']
+
+            # ⚠️ 정책 라우팅 설정: 메인 이더넷 우선순위 보존
+            # Table = off: 메인 라우팅 테이블에 route를 추가하지 않음
+            # PostUp: worker_id에 해당하는 정책 라우팅 테이블에만 default route 추가
+
+            # 라우팅 테이블 번호 계산 (200~211)
+            table_num = 199 + self.worker_id
+
+            # Gateway 계산 (내부 IP 대역의 .1)
+            # 예: 10.8.0.14/24 → 10.8.0.1
+            internal_ip = self.vpn_key_data['internal_ip']
+            gateway = '.'.join(internal_ip.split('.')[:3]) + '.1'
+
+            # WireGuard 설정 수정
+            config_lines = config_content.split('\n')
+            modified_lines = []
+
+            for line in config_lines:
+                modified_lines.append(line)
+                # [Interface] 섹션 다음에 정책 라우팅 설정 추가
+                if line.strip() == '[Interface]':
+                    modified_lines.append(f'# VPN 키 풀 정책 라우팅 (UID {2000 + self.worker_id} → 테이블 {table_num})')
+                    modified_lines.append('Table = off')
+                    modified_lines.append(f'PostUp = ip route add default via {gateway} dev %i table {table_num}')
+                    modified_lines.append(f'PostDown = ip route del default table {table_num} 2>/dev/null || true')
+
+            config_content = '\n'.join(modified_lines)
 
             # /tmp/vpn_configs 디렉토리 생성
             config_dir = Path("/tmp/vpn_configs")
@@ -238,6 +265,8 @@ class VPNConnection:
             os.chmod(self.config_path, 0o600)  # 보안을 위해 600 권한 설정
 
             print(f"   📝 WireGuard 설정 파일 생성: {self.config_path}")
+            print(f"      ✓ Table = off (메인 라우팅 테이블 보존)")
+            print(f"      ✓ 정책 라우팅: UID {2000 + self.worker_id} → 테이블 {table_num}")
 
             # 3. WireGuard 연결
             print(f"   🔌 WireGuard 연결 중 ({self.interface_name})...")

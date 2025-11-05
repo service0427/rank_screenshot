@@ -390,6 +390,82 @@ rm -f "$TMP_FILE"
 echo ""
 
 # ===================================================================
+# 10/10 VPN 키 풀 워커 사용자 및 정책 라우팅 설정
+# ===================================================================
+
+log_step "10/10 VPN 키 풀 워커 사용자 및 정책 라우팅 설정 중..."
+echo ""
+
+log_info "VPN 키 풀 시스템용 시스템 사용자 생성 (vpn-worker-1 ~ vpn-worker-12)"
+log_info "  UID 범위: 2001~2012"
+log_info "  라우팅 테이블: 200~211"
+echo ""
+
+# VPN 워커 사용자 생성 및 정책 라우팅 설정
+WORKERS_CREATED=0
+RULES_ADDED=0
+
+for i in {1..12}; do
+    uid=$((2000 + i))
+    username="vpn-worker-$i"
+    table_num=$((199 + i))
+
+    # 사용자 생성 (이미 존재하면 스킵)
+    if ! id "$username" &>/dev/null; then
+        sudo useradd -u $uid -M -s /bin/bash "$username" 2>/dev/null
+        if [ $? -eq 0 ]; then
+            ((WORKERS_CREATED++))
+            log_info "  ✓ 사용자 생성: $username (UID $uid)"
+        fi
+    else
+        log_info "  ⊙ 사용자 존재: $username (UID $uid)"
+    fi
+
+    # 정책 라우팅 규칙 추가 (중복 확인)
+    if ! sudo ip rule list | grep -q "uidrange $uid-$uid"; then
+        sudo ip rule add uidrange $uid-$uid lookup $table_num priority 100
+        if [ $? -eq 0 ]; then
+            ((RULES_ADDED++))
+            log_info "  ✓ 라우팅 규칙 추가: UID $uid → 테이블 $table_num"
+        fi
+    else
+        log_info "  ⊙ 라우팅 규칙 존재: UID $uid → 테이블 $table_num"
+    fi
+done
+
+echo ""
+log_success "VPN 워커 설정 완료"
+log_info "  생성된 사용자: $WORKERS_CREATED개"
+log_info "  추가된 라우팅 규칙: $RULES_ADDED개"
+
+# sudoers 설정 (tech → vpn-worker-N 전환 가능)
+VPNWORKER_SUDOERS="/etc/sudoers.d/vpn-workers"
+
+log_info "sudoers 설정 중 (tech → vpn-worker-N 전환 권한)..."
+
+# sudoers 파일 내용
+VPNWORKER_CONTENT="# VPN 키 풀 워커 전환 권한
+# tech 사용자가 vpn-worker-N 사용자로 전환 가능 (Chrome 프로세스용)
+$CURRENT_USER ALL=(vpn-worker-1,vpn-worker-2,vpn-worker-3,vpn-worker-4,vpn-worker-5,vpn-worker-6,vpn-worker-7,vpn-worker-8,vpn-worker-9,vpn-worker-10,vpn-worker-11,vpn-worker-12) NOPASSWD: ALL"
+
+# 임시 파일 생성
+TMP_FILE2=$(mktemp)
+echo "$VPNWORKER_CONTENT" > "$TMP_FILE2"
+
+# sudoers 문법 검증
+if sudo visudo -c -f "$TMP_FILE2" > /dev/null 2>&1; then
+    sudo cp "$TMP_FILE2" "$VPNWORKER_SUDOERS"
+    sudo chmod 0440 "$VPNWORKER_SUDOERS"
+    log_success "sudoers 설정 완료: $VPNWORKER_SUDOERS"
+else
+    log_warn "sudoers 설정 실패 (권한 확인 필요)"
+fi
+
+rm -f "$TMP_FILE2"
+
+echo ""
+
+# ===================================================================
 # 설치 완료
 # ===================================================================
 

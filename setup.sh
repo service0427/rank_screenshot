@@ -180,18 +180,65 @@ else
 fi
 
 # ===================================================================
-# 5. Chrome 버전 설치
+# 5. Chrome 130, 144 설치
 # ===================================================================
 
-log_step "5/9 Chrome 버전 설치 중..."
+log_step "5/9 Chrome 130, 144 설치 중..."
 echo ""
 
-if [ -x "$SCRIPT_DIR/install-chrome-versions.sh" ]; then
-    # Chrome 130, 144 자동 설치
-    "$SCRIPT_DIR/install-chrome-versions.sh"
+CHROME_BASE_DIR="$SCRIPT_DIR/chrome-version"
+CHROME_FOR_TESTING_URL="https://storage.googleapis.com/chrome-for-testing-public"
+
+mkdir -p "$CHROME_BASE_DIR"
+
+# Chrome 130 설치
+if [ -f "$CHROME_BASE_DIR/130/chrome-linux64/chrome" ]; then
+    log_success "Chrome 130 이미 설치됨 (건너뛰기)"
 else
-    log_error "install-chrome-versions.sh not found or not executable!"
-    exit 1
+    log_info "Chrome 130 (v130.0.6723.116) 다운로드 중..."
+
+    CHROME_130_URL="${CHROME_FOR_TESTING_URL}/130.0.6723.116/linux64/chrome-linux64.zip"
+    CHROME_130_ZIP="/tmp/chrome-130.zip"
+
+    wget -q --show-progress "$CHROME_130_URL" -O "$CHROME_130_ZIP"
+
+    if [ $? -eq 0 ]; then
+        log_info "Chrome 130 압축 해제 중..."
+        mkdir -p "$CHROME_BASE_DIR/130"
+        unzip -q "$CHROME_130_ZIP" -d "$CHROME_BASE_DIR/130"
+        chmod +x "$CHROME_BASE_DIR/130/chrome-linux64/chrome"
+        rm -f "$CHROME_130_ZIP"
+        log_success "Chrome 130 설치 완료"
+    else
+        log_error "Chrome 130 다운로드 실패"
+        exit 1
+    fi
+fi
+
+echo ""
+
+# Chrome 144 설치
+if [ -f "$CHROME_BASE_DIR/144/chrome-linux64/chrome" ]; then
+    log_success "Chrome 144 이미 설치됨 (건너뛰기)"
+else
+    log_info "Chrome 144 (v144.0.7500.2) 다운로드 중..."
+
+    CHROME_144_URL="${CHROME_FOR_TESTING_URL}/144.0.7500.2/linux64/chrome-linux64.zip"
+    CHROME_144_ZIP="/tmp/chrome-144.zip"
+
+    wget -q --show-progress "$CHROME_144_URL" -O "$CHROME_144_ZIP"
+
+    if [ $? -eq 0 ]; then
+        log_info "Chrome 144 압축 해제 중..."
+        mkdir -p "$CHROME_BASE_DIR/144"
+        unzip -q "$CHROME_144_ZIP" -d "$CHROME_BASE_DIR/144"
+        chmod +x "$CHROME_BASE_DIR/144/chrome-linux64/chrome"
+        rm -f "$CHROME_144_ZIP"
+        log_success "Chrome 144 설치 완료"
+    else
+        log_error "Chrome 144 다운로드 실패"
+        exit 1
+    fi
 fi
 
 # ===================================================================

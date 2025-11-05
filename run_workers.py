@@ -14,8 +14,8 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
-# VPN API 클라이언트
-from lib.modules.vpn_api_client import VPNAPIClient
+# VPN API 클라이언트 (VPN 키 풀 동적 할당/반납)
+from lib.modules.vpn_api_client import VPNAPIClient, VPNConnection
 
 
 # ============================================================
@@ -529,17 +529,22 @@ def calculate_window_position(worker_id: int, window_width: int = None, window_h
 
 def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode: str = None, vpn_list: list = None, window_config: dict = None, blocked_manager: BlockedCombinationsManager = None, vpn_allocation_manager: VPNAllocationManager = None):
     """
-    개별 워커 실행
+    개별 워커 실행 (VPN 키 풀 지원)
 
     Args:
         worker_id: 워커 ID (1부터 시작)
         iterations: 반복 횟수 (None이면 무한 루프)
         stats: 통계 객체
         adjust_mode: Adjust 모드 ("adjust", "adjust2", None)
-        vpn_list: VPN 번호 리스트 (None: 사용 안 함, ['L', '0', '1'] 등)
+        vpn_list: VPN 리스트 (None: 사용 안 함, ['L']: Local만, True: VPN 키 풀 사용)
         window_config: 창 설정 (width, height, x, y)
         blocked_manager: 차단 조합 관리자 (VPN + Chrome 버전 조합 차단 관리)
-        vpn_allocation_manager: VPN 동시 할당 관리자 (중복 사용 방지)
+        vpn_allocation_manager: DEPRECATED - VPN 키 풀 API가 자동 관리
+
+    VPN 키 풀 사용법:
+        - vpn_list=None: VPN 사용 안 함 (Local)
+        - vpn_list=['L']: Local 명시적 사용
+        - vpn_list=True: VPN 키 풀 사용 (동적 할당/반납)
     """
     if iterations is None:
         print(f"[Worker-{worker_id}] 시작 - 무한 루프 (instance_id={worker_id})")
@@ -549,6 +554,9 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
         is_infinite = False
 
     i = 0
+    vpn_client = VPNAPIClient() if vpn_list and vpn_list != ['L'] else None
+    vpn_conn = None  # VPN 연결 객체 (작업마다 새로 생성)
+
     while True:
         i += 1
 
@@ -560,58 +568,47 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
 
             iteration_str = f"{i}" if is_infinite else f"{i}/{iterations}"
 
-            # VPN 선택 전에 사용 가능한 VPN 필터링
-            available_vpns = []
             # 실제로 설치된 Chrome 버전만 체크
             check_versions = scan_chrome_versions()
             if not check_versions:
                 print(f"\n[Worker-{worker_id}] ❌ Chrome이 설치되어 있지 않습니다!")
                 break
 
-            # 1단계: 차단되지 않은 VPN 필터링
-            if vpn_list and blocked_manager:
-                # 각 VPN에 대해 모든 버전이 차단되었는지 확인
-                for vpn in vpn_list:
-                    blocked_count = 0
-                    for ver in check_versions:
-                        is_blocked, _ = blocked_manager.is_blocked(vpn, ver)
-                        if is_blocked:
-                            blocked_count += 1
+            # VPN 모드 결정: Local / VPN 키 풀
+            use_vpn = False
+            selected_vpn = None  # 'L' (Local) 또는 'VPN' (키 풀)
 
-                    # 모든 버전이 차단되지 않았으면 사용 가능
-                    if blocked_count < len(check_versions):
-                        available_vpns.append(vpn)
-            elif vpn_list:
-                # blocked_manager가 없으면 모든 VPN 사용 가능
-                available_vpns = vpn_list.copy()
+            if vpn_list == ['L']:
+                # Local 명시적 사용
+                selected_vpn = 'L'
+                use_vpn = False
+            elif vpn_list and vpn_list != ['L']:
+                # VPN 키 풀 사용
+                selected_vpn = 'VPN'
+                use_vpn = True
+            else:
+                # vpn_list가 None이면 Local
+                selected_vpn = None
+                use_vpn = False
 
-            # 2단계: 사용 중이지 않은 VPN 필터링 (동시 할당 제한)
-            if vpn_allocation_manager and available_vpns:
-                available_vpns = vpn_allocation_manager.get_available_vpns(available_vpns)
+            # 선택된 모드의 남아있는 Chrome 프로세스 정리
+            cleanup_chrome_processes(vpn=selected_vpn, instance_id=worker_id)
 
-            # 사용 가능한 VPN이 없으면 1분 대기 후 재시도
-            if vpn_list and len(available_vpns) == 0:
+            # VPN 키 풀 연결 (use_vpn=True인 경우)
+            if use_vpn and vpn_client:
                 print(f"\n[Worker-{worker_id}] 작업 {iteration_str}")
                 print("=" * 60)
-                print(f"   ⏸️  사용 가능한 VPN이 없음 (차단됨 또는 모두 사용 중)")
-                print(f"   ⏰ 1분 후 재시도...")
-                time.sleep(60)
-                # i를 증가시키지 않음 (재시도이므로 작업 횟수에 포함 안 함)
-                if not is_infinite:
-                    i -= 1  # 다음 루프에서 i += 1 되므로 상쇄
-                continue
-
-            # VPN 랜덤 선택 (사용 가능한 VPN 중에서)
-            selected_vpn = None
-            if available_vpns:
-                selected_vpn = random.choice(available_vpns)
-
-            # VPN 할당 (사용 중으로 표시)
-            if vpn_allocation_manager and selected_vpn:
-                vpn_allocation_manager.allocate(selected_vpn)
-
-            # 선택된 VPN의 남아있는 Chrome 프로세스 정리
-            cleanup_chrome_processes(vpn=selected_vpn, instance_id=worker_id)
+                vpn_conn = VPNConnection(worker_id=worker_id, vpn_client=vpn_client)
+                if not vpn_conn.connect():
+                    print(f"   ❌ VPN 연결 실패 - 1분 후 재시도...")
+                    time.sleep(60)
+                    if not is_infinite:
+                        i -= 1
+                    continue
+                # VPN 연결 성공 후 selected_vpn을 VPN 내부 IP로 업데이트 (로깅용)
+                vpn_internal_ip = vpn_conn.get_internal_ip()
+            else:
+                vpn_internal_ip = None
 
             # 선택된 VPN에서 차단되지 않은 Chrome 버전 필터링
             selected_version = "random"  # 기본값
@@ -636,22 +633,26 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
             # 작업 시작 메시지
             if selected_vpn == 'L':
                 vpn_str = "Local"
-            elif selected_vpn:
-                vpn_str = f"VPN: {selected_vpn}"
+            elif selected_vpn == 'VPN':
+                vpn_str = f"VPN 키 풀 ({vpn_internal_ip})" if vpn_internal_ip else "VPN 키 풀"
             else:
                 vpn_str = ""
 
             chrome_str = f"Chrome {selected_version}"
-            if selected_vpn:
-                print(f"\n[Worker-{worker_id}] 작업 {iteration_str} 시작 ({vpn_str}, {chrome_str})")
-            else:
-                print(f"\n[Worker-{worker_id}] 작업 {iteration_str} 시작 ({chrome_str})")
-            print("=" * 60)
+            if not use_vpn:  # VPN 연결이 없을 때만 출력 (VPN은 이미 연결 메시지 출력됨)
+                print(f"\n[Worker-{worker_id}] 작업 {iteration_str} 시작")
+                print("=" * 60)
+
+            if vpn_str:
+                print(f"   🌐 네트워크: {vpn_str}")
+            print(f"   🌐 브라우저: {chrome_str}")
 
             # 차단된 버전이 있으면 경고 출력
             if len(blocked_versions) > 0:
                 if selected_vpn == 'L':
                     vpn_display = "Local"
+                elif selected_vpn == 'VPN':
+                    vpn_display = "VPN 키 풀"
                 else:
                     vpn_display = f"VPN {selected_vpn}"
                 print(f"   ⚠️  차단된 Chrome 버전 건너뜀 ({vpn_display})")
@@ -660,15 +661,12 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                 print(f"   ✓ Chrome {selected_version} 선택")
 
             # agent.py 실행 명령어 구성 (차단되지 않은 버전으로 실행)
+            # ⚠️ VPN 키 풀 사용 시 --vpn 옵션 제거! (네트워크 계층에서 이미 VPN 연결됨)
             cmd = [
                 "python3", "agent.py",
                 "--work-api",
                 "--version", selected_version,
             ]
-
-            # VPN 옵션 추가
-            if selected_vpn and selected_vpn != 'L':
-                cmd.extend(["--vpn", str(selected_vpn)])
 
             # Adjust 모드 옵션 추가 (선택 사항)
             if adjust_mode == "adjust":
@@ -831,7 +829,16 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
             )
 
         finally:
-            # VPN 할당 해제 (모든 경우에 실행)
+            # VPN 연결 해제 및 키 반납 (모든 경우에 실행)
+            if vpn_conn:
+                try:
+                    vpn_conn.disconnect()
+                except Exception as e:
+                    print(f"   ⚠️  VPN 연결 해제 중 오류: {e}")
+                finally:
+                    vpn_conn = None  # 다음 작업을 위해 초기화
+
+            # DEPRECATED: VPN 할당 관리자 (하위 호환성 유지)
             if vpn_allocation_manager and 'selected_vpn' in locals() and selected_vpn:
                 vpn_allocation_manager.release(selected_vpn)
 

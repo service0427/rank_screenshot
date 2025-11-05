@@ -956,10 +956,10 @@ def main():
         vpn_client = VPNAPIClient()
         servers = vpn_client.get_server_list()
         if servers and len(servers) > 0:
-            # 🧪 테스트: Local 모드 강제 (VPN 키 풀 비활성화)
+            # VPN 키 풀 사용 (True로 설정하면 워커가 동적 할당 사용)
+            vpn_list = True
             print(f"   ✓ VPN 키 풀 사용 가능 (서버 {len(servers)}개)")
-            print(f"   🧪 테스트: Local 모드로 강제 실행")
-            vpn_list = ['L']
+            print(f"   ✓ VPN 키 동적 할당 모드 활성화")
         else:
             print(f"   ⚠️  VPN 서버 없음 - Local 모드 사용")
             vpn_list = ['L']

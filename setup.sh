@@ -93,6 +93,7 @@ echo ""
 sudo apt-get install -y \
     wireguard \
     wireguard-tools \
+    openresolv \
     wget \
     curl \
     unzip \
@@ -340,6 +341,51 @@ else
     log_info "  서버가 실행 중인지 확인하세요"
     log_info "  URL: $VPN_API_SERVER"
 fi
+
+echo ""
+
+# ===================================================================
+# 9/9 WireGuard sudoers 설정 (VPN 키 풀 자동화)
+# ===================================================================
+
+log_step "9/9 WireGuard sudoers 설정 중..."
+echo ""
+
+SUDOERS_FILE="/etc/sudoers.d/wireguard"
+
+log_info "WireGuard sudo 권한 설정 (비밀번호 없이 wg-quick 실행)"
+log_info "  사용자: $CURRENT_USER"
+log_info "  파일: $SUDOERS_FILE"
+echo ""
+
+# sudoers 파일 내용
+SUDOERS_CONTENT="# WireGuard sudo 권한 (VPN 키 풀 시스템용)
+# $CURRENT_USER 사용자가 비밀번호 없이 wg-quick 명령 실행 가능
+# VPN 키 풀 시스템이 자동으로 WireGuard 연결/해제를 수행하기 위해 필요
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/wg-quick"
+
+# 임시 파일에 작성
+TMP_FILE=$(mktemp)
+echo "$SUDOERS_CONTENT" > "$TMP_FILE"
+
+# sudoers 문법 검증
+log_info "sudoers 문법 검증 중..."
+if sudo visudo -c -f "$TMP_FILE" > /dev/null 2>&1; then
+    log_success "문법 검증 통과"
+
+    # sudoers 파일 복사
+    log_info "sudoers 파일 생성 중..."
+    sudo cp "$TMP_FILE" "$SUDOERS_FILE"
+    sudo chmod 0440 "$SUDOERS_FILE"
+
+    log_success "WireGuard sudoers 설정 완료"
+    log_info "  ✓ $CURRENT_USER는 이제 sudo wg-quick을 비밀번호 없이 실행 가능"
+else
+    log_error "sudoers 문법 오류 발생!"
+    rm "$TMP_FILE"
+fi
+
+rm -f "$TMP_FILE"
 
 echo ""
 

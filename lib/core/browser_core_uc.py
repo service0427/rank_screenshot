@@ -65,7 +65,7 @@ class BrowserCoreUC:
 
         return versions
 
-    def get_chrome_options(self, use_profile: bool = True, window_position: str = None, enable_network_filter: bool = False, proxy_address: str = None):
+    def get_chrome_options(self, use_profile: bool = True, window_position: str = None, enable_network_filter: bool = False):
         """
         Chrome 옵션 설정
 
@@ -73,7 +73,6 @@ class BrowserCoreUC:
             use_profile: 프로필 사용 여부
             window_position: 창 위치 (예: "100,200")
             enable_network_filter: 네트워크 필터 활성화 여부
-            proxy_address: SOCKS5 프록시 주소 (예: "112.161.54.7:10022")
 
         Returns:
             Chrome Options
@@ -84,37 +83,6 @@ class BrowserCoreUC:
         options.add_argument("--no-sandbox")
         options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-blink-features=AutomationControlled")
-
-        # SOCKS5 프록시 설정 (인증 불필요)
-        if proxy_address:
-            options.add_argument(f"--proxy-server=socks5://{proxy_address}")
-
-            # Chrome 내부 서비스는 프록시 우회 (시작 크래시 방지)
-            bypass_list = [
-                "localhost",
-                "127.0.0.1",
-                "*.googleapis.com",
-                "*.gstatic.com",
-                "*.google.com",
-                "clients2.google.com",  # Chrome 업데이트
-                "update.googleapis.com"  # Chrome 컴포넌트
-            ]
-            options.add_argument(f"--proxy-bypass-list={';'.join(bypass_list)}")
-
-            # 프록시 사용 시 Chrome 시작 안정화 옵션
-            options.add_argument("--no-first-run")
-            options.add_argument("--disable-sync")
-            options.add_argument("--disable-default-apps")
-
-            # 프록시 프로필 간 캐시 공유
-            project_root = Path(__file__).parent.parent.parent
-            shared_cache_dir = project_root / "browser-profiles" / "cache-shared"
-            shared_cache_dir.mkdir(parents=True, exist_ok=True)
-            options.add_argument(f"--disk-cache-dir={str(shared_cache_dir)}")
-
-            print(f"   🌐 SOCKS5 프록시 설정: {proxy_address}")
-            print(f"   ↪️  프록시 우회: Chrome 내부 서비스")
-            print(f"   💾 공유 캐시: {shared_cache_dir}")
 
         # 네트워크 필터 (Chrome Extension - declarativeNetRequest)
         if enable_network_filter:
@@ -201,8 +169,7 @@ class BrowserCoreUC:
         window_height: int = 1200,
         window_x: int = 10,
         window_y: int = 10,
-        enable_network_filter: bool = False,
-        proxy_address: str = None
+        enable_network_filter: bool = False
     ):
         """
         Chrome 실행 (undetected-chromedriver)
@@ -217,7 +184,6 @@ class BrowserCoreUC:
             window_x: 창 X 위치 (기본: 10)
             window_y: 창 Y 위치 (기본: 10)
             enable_network_filter: 네트워크 필터 활성화 여부
-            proxy_address: SOCKS5 프록시 주소 (예: "112.161.54.7:10022")
 
         Returns:
             WebDriver 객체
@@ -250,16 +216,8 @@ class BrowserCoreUC:
             chrome_path = versions[version]
 
         # 프로필 디렉토리 설정
-        # 프록시 사용 시: /home/tech/rank_screenshot/browser-profiles/proxy 사용 (영구 저장)
-        # VPN 사용 시: 사용자별 홈 디렉토리 사용 (사용자 격리)
-        if proxy_address:
-            # 프록시 사용: 프로젝트 루트의 browser-profiles/proxy 디렉토리
-            project_root = Path(__file__).parent.parent.parent
-            profile_base = project_root / "browser-profiles" / "proxy"
-            profile_base.mkdir(parents=True, exist_ok=True)
-        else:
-            # VPN 또는 로컬: 사용자별 홈 디렉토리
-            profile_base = Config.get_profile_dir_base()
+        # VPN 또는 로컬: 사용자별 홈 디렉토리 사용 (사용자 격리)
+        profile_base = Config.get_profile_dir_base()
 
         vpn_num = os.getenv('VPN_EXECUTED')
 
@@ -366,8 +324,7 @@ class BrowserCoreUC:
         options = self.get_chrome_options(
             use_profile=use_profile,
             window_position=window_position_arg,
-            enable_network_filter=enable_network_filter,
-            proxy_address=proxy_address
+            enable_network_filter=enable_network_filter
         )
 
         # Chrome 바이너리 경로 설정 (이중 보장)

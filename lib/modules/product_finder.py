@@ -1037,6 +1037,39 @@ class ProductFinder:
         print(f"   검색 조건: product_id={product_id}, item_id={item_id}, vendor_item_id={vendor_item_id}")
         return (None, None)
 
+    def fix_pagination_visibility(self) -> bool:
+        """
+        페이지네이션을 항상 표시되도록 강제 설정
+
+        쿠팡 검색 결과 페이지에서 페이지네이션은 기본적으로 스크롤을 내려야 보임.
+        스크린샷에 현재 페이지 번호가 보이도록 .fixedPagination 클래스를 강제 추가함.
+
+        Returns:
+            성공 여부
+        """
+        try:
+            print("   🔧 페이지네이션 고정 중...")
+
+            # ProductList 컨테이너를 찾아서 fixedPagination 클래스 추가
+            self.driver.execute_script("""
+                const container = document.querySelector('div:has(> div[class^="ProductList_productList__"])');
+                if (container) {
+                    container.classList.add('fixedPagination');
+                    console.log('✓ fixedPagination 클래스 추가됨');
+                    return true;
+                } else {
+                    console.log('⚠ ProductList 컨테이너를 찾을 수 없음');
+                    return false;
+                }
+            """)
+
+            print("   ✅ 페이지네이션 고정 완료")
+            return True
+
+        except Exception as e:
+            print(f"   ⚠️  페이지네이션 고정 실패: {e}")
+            return False
+
     def scroll_full_page_for_lazy_loading(self, rounds: int = 2, scroll_pause: float = 0.5) -> None:
         """
         검색 결과 페이지 전체를 위아래로 스크롤하여 모든 lazy 이미지 트리거

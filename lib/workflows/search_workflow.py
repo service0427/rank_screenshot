@@ -521,6 +521,12 @@ class SearchWorkflow:
             성공 여부
         """
         try:
+            # 0. 페이지네이션 고정 (스크린샷에 페이지 번호 표시)
+            try:
+                self.finder.fix_pagination_visibility()
+            except Exception as e:
+                print(f"⚠️  페이지네이션 고정 실패 (계속 진행): {e}")
+
             # 1. 상품 분석 및 디버그 오버레이
             try:
                 # finder의 analyze_product_list_structure()를 사용하여 광고 여부 판단

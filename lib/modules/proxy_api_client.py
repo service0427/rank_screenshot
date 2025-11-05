@@ -12,11 +12,11 @@ class ProxyAPIClient:
     """
     프록시 API 클라이언트
 
-    API 엔드포인트: http://220.121.120.83/vpn_socks5/api/list.php?type=proxy
+    API 엔드포인트: http://techb.kr/vpn_socks5/api/list.php?type=proxy
     응답 형식: ["IP1", "IP2", ...] (IP 리스트, 인증 불필요)
     """
 
-    API_URL = "http://220.121.120.83/vpn_socks5/api/list.php?type=proxy"
+    API_URL = "http://techb.kr/vpn_socks5/api/list.php?type=proxy"
     SOCKS5_PORT = 10000  # 고정 포트
 
     def __init__(self, timeout: int = 10):
@@ -177,6 +177,52 @@ class ProxyAPIClient:
             return False
 
         return True
+
+    def get_socks5_list_with_local(self) -> List[str]:
+        """
+        SOCKS5 목록을 가져오고 'L' (Local) 추가
+
+        Returns:
+            ['L', '0', '1', '2', ...] 형식의 리스트
+            - 'L': Local (프록시 없이 직접 연결)
+            - '0', '1', '2', ...: SOCKS5 번호 (IP 배열 인덱스)
+        """
+        try:
+            proxies = self.fetch_proxies()
+
+            # ['L', '0', '1', '2', ...] 형식으로 변환
+            socks5_list = ['L']  # Local 항상 포함
+            socks5_list.extend([str(i) for i in range(len(proxies))])
+
+            return socks5_list
+
+        except Exception as e:
+            print(f"❌ SOCKS5 목록 조회 실패: {e}")
+            print("   ⚠️  Local 모드만 사용합니다")
+            return ['L']
+
+    def get_ip_by_socks5_number(self, socks5_number: int) -> Optional[str]:
+        """
+        SOCKS5 번호로 IP 주소 조회
+
+        Args:
+            socks5_number: SOCKS5 번호 (0부터 시작하는 인덱스)
+
+        Returns:
+            IP 주소 또는 None (범위 초과 시)
+        """
+        try:
+            proxies = self.fetch_proxies()
+
+            if 0 <= socks5_number < len(proxies):
+                return proxies[socks5_number]
+            else:
+                print(f"❌ SOCKS5 번호 {socks5_number}가 범위를 벗어났습니다 (최대: {len(proxies) - 1})")
+                return None
+
+        except Exception as e:
+            print(f"❌ SOCKS5 IP 조회 실패: {e}")
+            return None
 
 
 def get_proxy_address(proxy_arg: str = None) -> Optional[str]:

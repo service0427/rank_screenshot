@@ -65,8 +65,9 @@ def load_last_version() -> str:
 def wait_for_user_or_close(driver, core, close_after: bool = False):
     """사용자 입력 또는 브라우저 종료 대기"""
     if close_after:
-        print("\n⏱️  Closing browser in 3 seconds...\n")
+        print(f"\n⏱️  Closing browser in 3 seconds... (close_after={close_after})\n")
         time.sleep(3)
+        print("   ✅ 3초 대기 완료, 브라우저 종료 진행 중...\n")
     else:
         print("\n💡 Browser is running. Press Enter or Ctrl+C to close, or close the window manually.\n")
         try:
@@ -153,8 +154,10 @@ def run_agent_selenium_uc(
     vpn_num = os.environ.get('VPN_EXECUTED')
     if vpn_num is not None:
         print(f"🌐 VPN: ✅ wg{vpn_num}/vpn{vpn_num} (Enabled)")
+    elif proxy_address:
+        print(f"🌐 Proxy: ✅ SOCKS5 {proxy_address}")
     else:
-        print(f"🌐 VPN: ❌ Not used (Local IP)")
+        print(f"🌐 Network: ❌ Local IP (Direct)")
     print("=" * 60 + "\n")
 
     core = None
@@ -222,7 +225,7 @@ def run_agent_selenium_uc(
         # === 4. 네트워크 모드 결정 ===
         network_mode = "Local"
         if proxy_address:
-            network_mode = "Proxy"
+            network_mode = f"Proxy {proxy_address}"
         else:
             # VPN 사용자인지 확인 (vpn0, vpn1, ... 형식)
             current_user = os.getenv('USER', '')
@@ -976,7 +979,8 @@ Examples:
         window_y=args.window_y,
         enable_rank_adjust=args.adjust,
         adjust_mode="adjust" if args.adjust else None,
-        enable_main_filter=args.enable_main_filter
+        enable_main_filter=args.enable_main_filter,
+        proxy_address=proxy_address
     )
 
 

@@ -142,8 +142,24 @@ class CoupangHandlerSelenium:
 
             if not result:
                 print("   ✗ Search input not found")
-                self.action_status = ActionStatus.ERROR_ELEMENT_NOT_FOUND
-                return False
+                print("   🔄 페이지 새로고침 후 재시도...")
+
+                # 새로고침
+                self.driver.refresh()
+                time.sleep(3)  # 로딩 대기
+
+                # 검색 전 마우스 움직임 다시
+                before_search(self.driver)
+
+                # 재시도
+                result = self.driver.execute_script(search_script, keyword)
+
+                if not result:
+                    print("   ✗ Search input not found (재시도 후에도 실패)")
+                    self.action_status = ActionStatus.ERROR_ELEMENT_NOT_FOUND
+                    return False
+                else:
+                    print("   ✓ Search input found after refresh")
 
             print(f"   ✓ Search script executed for: {keyword}")
             self.status = ExecutionStatus.SEARCH_SUBMITTED

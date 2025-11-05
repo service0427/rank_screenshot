@@ -80,8 +80,47 @@ fi
 
 # 설정 내용 출력
 echo ""
-log_info "설정 내용:"
+log_info "설정 내용 (VPN → Tech):"
 cat "$SUDOERS_FILE"
+
+# ===================================================================
+# Tech 사용자가 VPN 사용자로 전환 가능하도록 설정
+# ===================================================================
+
+echo ""
+log_info "Tech → VPN 전환 설정 생성 중..."
+
+SUDOERS_FILE_REVERSE="/etc/sudoers.d/tech-to-vpn"
+
+cat > "$SUDOERS_FILE_REVERSE" << 'EOF'
+# tech 사용자가 VPN 사용자로 전환 가능
+# Agent 실행을 위해 필요
+
+# tech가 모든 VPN 사용자로 전환 가능 (NOPASSWD)
+EOF
+
+# 각 VPN 사용자마다 별도의 라인 추가
+for vpn_user in $VPN_USERS; do
+    echo "tech ALL=(${vpn_user}) NOPASSWD: ALL" >> "$SUDOERS_FILE_REVERSE"
+done
+
+# 권한 설정
+chmod 0440 "$SUDOERS_FILE_REVERSE"
+
+# 설정 검증
+if visudo -c -f "$SUDOERS_FILE_REVERSE" > /dev/null 2>&1; then
+    log_success "설정 검증 성공"
+else
+    log_error "설정 검증 실패 - 파일 삭제"
+    rm -f "$SUDOERS_FILE_REVERSE"
+    exit 1
+fi
+
+log_success "Sudoers 설정 파일 생성: $SUDOERS_FILE_REVERSE"
+
+echo ""
+log_info "설정 내용 (Tech → VPN):"
+cat "$SUDOERS_FILE_REVERSE"
 
 # ===================================================================
 # API 서버 IP를 VPN 라우팅에서 제외
@@ -158,7 +197,9 @@ echo "============================================================"
 log_success "설정 완료!"
 echo "============================================================"
 echo ""
-log_info "✅ Sudoers 설정 완료"
+log_info "✅ Sudoers 설정 완료 (양방향)"
+log_info "   - VPN → Tech: $SUDOERS_FILE"
+log_info "   - Tech → VPN: $SUDOERS_FILE_REVERSE"
 log_info "✅ API 서버 VPN 우회 규칙 추가 완료"
 log_info "✅ 재부팅 시 자동 복구 설정 완료"
 echo ""

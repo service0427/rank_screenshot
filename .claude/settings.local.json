@@ -8,7 +8,26 @@
       "WebFetch(domain:googlechromelabs.github.io)",
       "WebFetch(domain:ftp.mozilla.org)",
       "WebFetch(domain:raw.githubusercontent.com)",
-      "WebFetch(domain:api.github.com)"
+      "WebFetch(domain:api.github.com)",
+      "Bash(python3 agent.py:*)",
+      "Bash(test:*)",
+      "Bash(/home/tech/rank_screenshot/chrome-version/144/chrome-linux64/chrome:*)",
+      "Bash(ldd:*)",
+      "Bash(pkill:*)",
+      "Bash(python3:*)",
+      "Bash(timeout 10 python3:*)",
+      "Bash(timeout 30 python3:*)",
+      "Bash(timeout 40 python3:*)",
+      "Bash(sudo -u vpn0 ls:*)",
+      "Bash(sudo -u vpn0 DISPLAY=:0 /home/tech/rank_screenshot/chrome-version/144/chrome-linux64/chrome:*)",
+      "Bash(echo:*)",
+      "Bash(sudo -u vpn0 bash -c 'ps aux | grep chrome | grep -v grep')",
+      "Bash(lsof:*)",
+      "Bash(xhost:*)",
+      "Bash(DISPLAY=:0 xhost:*)",
+      "Bash(timeout 60 python3:*)",
+      "WebFetch(domain:mkt.techb.kr)",
+      "WebFetch(domain:220.121.120.83)"
     ]
   },
   "outputStyle": "Explanatory"

@@ -63,7 +63,14 @@ if [ -d "$PROFILES_DIR" ]; then
     # 777 권한 (VPN 사용자들이 하위 디렉토리 생성 가능)
     # 각 VPN은 자신의 프로필 디렉토리(vpnN-chrome-XXX/)를 생성
     chmod 777 "$PROFILES_DIR" 2>/dev/null || log_warn "Could not set permissions on $PROFILES_DIR"
-    log_success "Browser profiles directory writable (777)"
+
+    # 기존 프로필 디렉토리들(chrome-130, chrome-144 등)도 VPN 사용자가 쓸 수 있도록 설정
+    # 디렉토리: o+rwX (읽기/쓰기/실행)
+    # 파일: o+rw (읽기/쓰기) - Preferences, Local State 등
+    find "$PROFILES_DIR" -type d -exec chmod o+rwX {} \; 2>/dev/null || true
+    find "$PROFILES_DIR" -type f -exec chmod o+rw {} \; 2>/dev/null || true
+
+    log_success "Browser profiles directory writable (777) including subfiles"
 else
     mkdir -p "$PROFILES_DIR"
     chmod 777 "$PROFILES_DIR"
@@ -71,7 +78,45 @@ else
 fi
 
 # ===================================================================
-# 3. Undetected ChromeDriver 디렉토리 권한 설정
+# 3. Screenshots 디렉토리 권한 설정
+# ===================================================================
+
+log_info "Setting screenshots directory permissions..."
+
+SCREENSHOTS_DIR="$SCRIPT_DIR/screenshots"
+if [ -d "$SCREENSHOTS_DIR" ]; then
+    # 777 권한 (VPN 사용자들이 스크린샷 저장 가능)
+    chmod -R o+rwX "$SCREENSHOTS_DIR" 2>/dev/null || log_warn "Could not set permissions on $SCREENSHOTS_DIR"
+    log_success "Screenshots directory writable by VPN users"
+else
+    mkdir -p "$SCREENSHOTS_DIR"
+    chmod 777 "$SCREENSHOTS_DIR"
+    log_success "Screenshots directory created (777)"
+fi
+
+# ===================================================================
+# 4. Logs 디렉토리 권한 설정
+# ===================================================================
+
+log_info "Setting logs directory permissions..."
+
+LOGS_DIR="$SCRIPT_DIR/logs"
+if [ -d "$LOGS_DIR" ]; then
+    # 777 권한 (VPN 사용자들이 로그 작성 가능)
+    chmod 777 "$LOGS_DIR" 2>/dev/null || log_warn "Could not set permissions on $LOGS_DIR"
+
+    # 기존 로그 파일들도 쓰기 가능하도록
+    find "$LOGS_DIR" -type f -exec chmod o+rw {} \; 2>/dev/null || true
+
+    log_success "Logs directory writable by VPN users (777)"
+else
+    mkdir -p "$LOGS_DIR"
+    chmod 777 "$LOGS_DIR"
+    log_success "Logs directory created (777)"
+fi
+
+# ===================================================================
+# 5. Undetected ChromeDriver 디렉토리 권한 설정
 # ===================================================================
 
 log_info "Setting undetected_chromedriver directory permissions..."
@@ -93,7 +138,7 @@ else
 fi
 
 # ===================================================================
-# 4. Selenium 캐시 디렉토리 권한 설정
+# 5. Selenium 캐시 디렉토리 권한 설정
 # ===================================================================
 
 log_info "Setting selenium cache directory permissions..."
@@ -114,7 +159,7 @@ else
 fi
 
 # ===================================================================
-# 5. VPN 사용자 확인
+# 6. VPN 사용자 확인
 # ===================================================================
 
 log_info "Checking VPN users..."
@@ -128,7 +173,7 @@ else
 fi
 
 # ===================================================================
-# 6. Chrome 바이너리 실행 권한 설정
+# 7. Chrome 바이너리 실행 권한 설정
 # ===================================================================
 
 log_info "Setting Chrome binary execute permissions..."
@@ -163,13 +208,19 @@ fi
 
 log_info "Checking Python packages accessibility..."
 
-PYTHON_SITE_PACKAGES="$HOME_DIR/.local/lib/python3.12/site-packages"
+# Python 버전 자동 감지
+PYTHON_VERSION=$(python3 -c "import sys; print(f'{sys.version_info.major}.{sys.version_info.minor}')")
+PYTHON_SITE_PACKAGES="$HOME_DIR/.local/lib/python${PYTHON_VERSION}/site-packages"
+
+log_info "Detected Python version: $PYTHON_VERSION"
+log_info "Python site-packages path: $PYTHON_SITE_PACKAGES"
+
 if [ -d "$PYTHON_SITE_PACKAGES" ]; then
     # 읽기 권한만 필요
     chmod o+rx "$HOME_DIR/.local" 2>/dev/null || true
     chmod o+rx "$HOME_DIR/.local/lib" 2>/dev/null || true
     chmod -R o+rX "$PYTHON_SITE_PACKAGES" 2>/dev/null || log_warn "Could not set read permissions on Python packages"
-    log_success "Python packages readable by VPN users"
+    log_success "Python packages readable by VPN users (python${PYTHON_VERSION})"
 else
     log_warn "Python site-packages not found at $PYTHON_SITE_PACKAGES"
 fi

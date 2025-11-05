@@ -106,8 +106,15 @@ class BrowserCoreUC:
             options.add_argument("--disable-sync")
             options.add_argument("--disable-default-apps")
 
+            # 프록시 프로필 간 캐시 공유
+            project_root = Path(__file__).parent.parent.parent
+            shared_cache_dir = project_root / "browser-profiles" / "cache-shared"
+            shared_cache_dir.mkdir(parents=True, exist_ok=True)
+            options.add_argument(f"--disk-cache-dir={str(shared_cache_dir)}")
+
             print(f"   🌐 SOCKS5 프록시 설정: {proxy_address}")
             print(f"   ↪️  프록시 우회: Chrome 내부 서비스")
+            print(f"   💾 공유 캐시: {shared_cache_dir}")
 
         # 네트워크 필터 (Chrome Extension - declarativeNetRequest)
         if enable_network_filter:
@@ -243,11 +250,12 @@ class BrowserCoreUC:
             chrome_path = versions[version]
 
         # 프로필 디렉토리 설정
-        # 프록시 사용 시: /tmp 사용 (권한 문제 없음, 간단함)
+        # 프록시 사용 시: /home/tech/rank_screenshot/browser-profiles/proxy 사용 (영구 저장)
         # VPN 사용 시: 사용자별 홈 디렉토리 사용 (사용자 격리)
         if proxy_address:
-            # 프록시 사용: /tmp 디렉토리 (tech 사용자만 사용, 권한 간단)
-            profile_base = Path("/tmp/coupang_agent_proxy_profiles")
+            # 프록시 사용: 프로젝트 루트의 browser-profiles/proxy 디렉토리
+            project_root = Path(__file__).parent.parent.parent
+            profile_base = project_root / "browser-profiles" / "proxy"
             profile_base.mkdir(parents=True, exist_ok=True)
         else:
             # VPN 또는 로컬: 사용자별 홈 디렉토리
@@ -381,20 +389,35 @@ class BrowserCoreUC:
         else:
             version_main = int(version)
 
-        # ChromeDriver 경로 설정
+        # ChromeDriver 경로 설정 및 워커별 복사본 생성
+        # 중요: 멀티 워커 환경에서 같은 ChromeDriver 바이너리를 공유하면
+        # undetected-chromedriver의 패치 프로세스가 충돌하여 Chrome이 종료됨
+        # 해결: 각 워커마다 독립적인 ChromeDriver 복사본 사용
         chromedriver_path = None
         if version.lower() in ['beta', 'dev', 'canary']:
             # 채널 버전
             channel_dir = Path(Config.PROFILE_DIR_BASE).parent / "chrome-version" / version.lower()
             chromedriver_bin = channel_dir / "chromedriver-linux64" / "chromedriver"
-            if chromedriver_bin.exists():
-                chromedriver_path = str(chromedriver_bin)
         else:
             # 일반 버전
             version_dir = Path(Config.PROFILE_DIR_BASE).parent / "chrome-version" / version
             chromedriver_bin = version_dir / "chromedriver-linux64" / "chromedriver"
-            if chromedriver_bin.exists():
-                chromedriver_path = str(chromedriver_bin)
+
+        if chromedriver_bin.exists():
+            # 워커별 ChromeDriver 복사본 생성 (멀티 워커 충돌 방지)
+            import shutil
+            instance_driver_dir = Path(f"/tmp/chromedriver_instance_{self.instance_id}_v{version}")
+            instance_driver_dir.mkdir(parents=True, exist_ok=True)
+            instance_driver_path = instance_driver_dir / "chromedriver"
+
+            # 원본에서 복사 (이미 있으면 건너뛰기)
+            if not instance_driver_path.exists():
+                shutil.copy2(chromedriver_bin, instance_driver_path)
+                # 실행 권한 부여
+                instance_driver_path.chmod(0o755)
+                print(f"   📋 ChromeDriver 복사: instance-{self.instance_id} 전용")
+
+            chromedriver_path = str(instance_driver_path)
 
         # ChromeDriver 서비스 포트 설정 (instance별 고유 포트)
         driver_port = 10000 + self.instance_id

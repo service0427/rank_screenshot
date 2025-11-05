@@ -184,11 +184,29 @@ def after_page_load(driver):
 
 
 def before_search(driver):
-    """검색 전 자연스러운 행동"""
-    random_delay(500, 1500)
+    """
+    검색 전 자연스러운 행동 (1-3초 소요)
+    - Akamai 봇 탐지 우회를 위한 마우스 움직임 패턴
+    - 1-2회 랜덤 마우스 이동
+    - 가끔 미세한 스크롤 추가
+    """
+    # 초기 딜레이 (200-500ms)
+    random_delay(200, 500)
 
-    # 마우스 이동
-    move_mouse_random(driver)
+    # 랜덤 마우스 이동 (1-2회)
+    num_moves = random.randint(1, 2)
+    for i in range(num_moves):
+        move_mouse_random(driver)
+        random_delay(200, 500)
+
+        # 20% 확률로 미세한 스크롤 추가
+        if random.random() < 0.2:
+            scroll_amount = random.randint(-100, 100)
+            driver.execute_script(f"window.scrollBy(0, {scroll_amount})")
+            random_delay(100, 300)
+
+    # 검색 전 마지막 딜레이 (300-600ms)
+    random_delay(300, 600)
 
 
 def before_product_click(element):

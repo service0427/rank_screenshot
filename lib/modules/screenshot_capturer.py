@@ -5,9 +5,10 @@
 """
 
 import os
+import stat
 import time
 from pathlib import Path
-from typing import Optional
+from typing import Optional, Dict
 from datetime import datetime
 
 
@@ -51,6 +52,9 @@ class ScreenshotCapturer:
             return None
 
         try:
+            # no_img 이미지 체크 및 해결 시도 (캡처 전)
+            self._resolve_no_img_in_viewport(max_retries=2)
+
             # 저장 경로 생성
             filepath = self._generate_filepath(keyword, product_id, item_id, vendor_item_id)
 
@@ -110,8 +114,18 @@ class ScreenshotCapturer:
         # screenshots/YYYY/MM/DD/
         year_month_day_dir = self.base_dir / now.strftime("%Y") / now.strftime("%m") / now.strftime("%d")
 
-        # 디렉토리 생성
+        # 디렉토리 생성 (VPN 사용자도 쓸 수 있도록 777 권한)
         year_month_day_dir.mkdir(parents=True, exist_ok=True)
+
+        # 명시적으로 권한 설정 (umask 무시, VPN 사용자도 쓸 수 있도록)
+        # VPN 사용자는 tech 소유 디렉토리 권한 변경 불가하므로 실패 시 무시
+        try:
+            os.chmod(year_month_day_dir, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # 777
+            # 상위 디렉토리도 설정 (YYYY, MM)
+            os.chmod(year_month_day_dir.parent, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # MM
+            os.chmod(year_month_day_dir.parent.parent, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # YYYY
+        except PermissionError:
+            pass  # VPN 사용자는 권한 변경 불가, tech 사용자가 setup-permissions.sh 실행 필요
 
         # 파일명 생성: His_{keyword}_{product_id}_{item_id}_{vendor_item_id}.png
         time_str = now.strftime("%H%M%S")
@@ -163,3 +177,92 @@ class ScreenshotCapturer:
         finally:
             # 원래 크기로 복원
             self.driver.set_window_size(original_size['width'], original_size['height'])
+
+    def check_no_img_in_viewport(self) -> Dict[str, int]:
+        """
+        Viewport 내 no_img 이미지 개수 체크
+
+        Returns:
+            {'viewport': viewport 내 no_img 개수, 'total': 전체 no_img 개수}
+        """
+        try:
+            result = self.driver.execute_script("""
+                const allImages = Array.from(document.querySelectorAll('img'));
+
+                // no_img 이미지 필터링
+                const noImgImages = allImages.filter(img =>
+                    img.src.includes('no_img_1000_1000.png')
+                );
+
+                // viewport 내 no_img 이미지 필터링
+                const noImgInViewport = noImgImages.filter(img => {
+                    const rect = img.getBoundingClientRect();
+                    return rect.top >= 0 &&
+                           rect.bottom <= window.innerHeight &&
+                           rect.left >= 0 &&
+                           rect.right <= window.innerWidth;
+                });
+
+                return {
+                    viewport: noImgInViewport.length,
+                    total: noImgImages.length
+                };
+            """)
+
+            print(f"   🖼️  no_img 이미지: viewport {result['viewport']}개 / 전체 {result['total']}개")
+
+            return result
+
+        except Exception as e:
+            print(f"   ⚠️  no_img 체크 실패: {e}")
+            return {'viewport': 0, 'total': 0}
+
+    def _resolve_no_img_in_viewport(self, max_retries: int = 2) -> bool:
+        """
+        Viewport 내 no_img 이미지 해결 시도
+
+        Args:
+            max_retries: 최대 재시도 횟수 (기본: 2)
+
+        Returns:
+            성공 여부 (viewport에 no_img 없으면 True)
+        """
+        for attempt in range(1, max_retries + 1):
+            # no_img 체크
+            result = self.check_no_img_in_viewport()
+            viewport_count = result['viewport']
+
+            # viewport에 no_img 없으면 성공
+            if viewport_count == 0:
+                if attempt > 1:
+                    print(f"   ✅ no_img 해결 완료 (시도 {attempt}회)")
+                return True
+
+            # no_img가 있으면 해결 시도
+            if attempt < max_retries:
+                print(f"   🔄 no_img 해결 시도 중... ({attempt}/{max_retries})")
+
+                # 1. 추가 대기 (네트워크 완료 대기)
+                time.sleep(2)
+
+                # 2. 미세 스크롤로 lazy loading 재트리거
+                try:
+                    self.driver.execute_script("""
+                        const currentScroll = window.scrollY;
+                        // 아래로 100px 스크롤
+                        window.scrollBy(0, 100);
+                        setTimeout(() => {
+                            // 원래 위치로 복귀
+                            window.scrollTo(0, currentScroll);
+                        }, 500);
+                    """)
+                    time.sleep(0.8)
+                except Exception as e:
+                    print(f"   ⚠️  스크롤 재트리거 실패: {e}")
+
+        # 최대 재시도 후에도 no_img가 있으면 경고
+        final_result = self.check_no_img_in_viewport()
+        if final_result['viewport'] > 0:
+            print(f"   ⚠️  viewport에 no_img {final_result['viewport']}개 남음 (계속 진행)")
+
+        return True  # 실패해도 캡처는 진행

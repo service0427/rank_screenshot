@@ -199,8 +199,20 @@ class SearchWorkflow:
                 result.error_message = "검색 결과 차단됨 (네트워크 오류 - http2 protocol error)"
                 return result
 
-            # 3. 에러 체크
+            # 빠른 차단 체크 (스크롤 전에 확인)
             print("\n🔍 Checking for errors...\n")
+            try:
+                page_source = self.driver.page_source.lower()
+                if any(keyword in page_source for keyword in ['rate limit', 'blocked', 'access denied', 'captcha', '일시적으로 차단', 'too many requests']):
+                    result.error_message = "검색 결과 차단됨 (IP 제한 또는 봇 감지)"
+                    print(f"🚫 차단 감지: 페이지 소스에서 차단 키워드 발견\n")
+                    return result
+            except:
+                pass
+
+            # 차단이 아니면 전체 페이지 스크롤로 이미지 로드
+            print("🔄 이미지 로드 최적화: 전체 페이지 스크롤 중...\n")
+            self.finder.scroll_full_page_for_lazy_loading(rounds=1, scroll_pause=0.1)
 
             # 4. 상품 목록 추출
             print("\n" + "=" * 60)
@@ -211,18 +223,7 @@ class SearchWorkflow:
             organic_products = structure["organic_products"]
 
             if not organic_products:
-                # 상품이 없을 때 차단 여부만 확인
-                try:
-                    page_source = self.driver.page_source.lower()
-                    # 차단 관련 메시지 확인
-                    if any(keyword in page_source for keyword in ['rate limit', 'blocked', 'access denied', 'captcha', '일시적으로 차단', 'too many requests']):
-                        result.error_message = "검색 결과 차단됨 (IP 제한 또는 봇 감지)"
-                        print(f"\n🚫 차단 감지: 페이지 소스에서 차단 키워드 발견")
-                        return result
-                except:
-                    pass
-
-                # 차단이 아니고 단순히 상품이 없는 경우 → 다음 페이지 탐색 계속
+                # 상품이 없는 경우 (차단은 이미 위에서 체크함)
                 print(f"\n⚠️  1페이지에 상품이 없습니다 - 다음 페이지 탐색을 계속합니다...")
                 organic_products = []  # 빈 리스트로 초기화하여 while 루프 진입
 
@@ -337,6 +338,10 @@ class SearchWorkflow:
 
                 # 다음 페이지 로딩 대기
                 self._wait_for_page_load()
+
+                # 전체 페이지 스크롤로 모든 이미지 Lazy Loading 트리거
+                print(f"   🔄 페이지 {current_page} 이미지 로드 최적화 중...")
+                self.finder.scroll_full_page_for_lazy_loading(rounds=1, scroll_pause=0.3)
 
                 # http2 protocol error 체크 (네트워크 오류 → 차단으로 처리)
                 if self._check_http2_error():

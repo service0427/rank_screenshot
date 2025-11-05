@@ -499,9 +499,6 @@ class ProductFinder:
 
             print(f"\n📍 상품을 화면 중앙으로 이동 중...")
 
-            # Lazy loading 이미지 강제 로드 (스크롤 전에 트리거)
-            self._trigger_lazy_images(element)
-
             # 사람처럼 자연스럽게 스크롤 (여러 단계로 나눠서)
             if video_recorder:
                 # 1. 목표 상품 위치 계산
@@ -550,11 +547,7 @@ class ProductFinder:
                         inline: 'nearest'
                     });
                 """, element)
-                time.sleep(2)  # 썸네일 로드 기본 대기 (2초)
-
-            # 이미지 로드 완료 대기 (최대 3초, 실패해도 진행)
-            print("   ⏳ 썸네일 이미지 로드 대기 중...")
-            self._wait_for_images_loaded(timeout=3)
+                time.sleep(1)  # 스크롤 완료 대기
 
             # 요소가 화면에 보이는지 확인
             is_visible = self.driver.execute_script("""
@@ -1044,116 +1037,65 @@ class ProductFinder:
         print(f"   검색 조건: product_id={product_id}, item_id={item_id}, vendor_item_id={vendor_item_id}")
         return (None, None)
 
-    def _wait_for_images_loaded(self, timeout: int = 3) -> bool:
+    def scroll_full_page_for_lazy_loading(self, rounds: int = 2, scroll_pause: float = 0.5) -> None:
         """
-        뷰포트 내 모든 이미지 로드 완료 대기
+        검색 결과 페이지 전체를 위아래로 스크롤하여 모든 lazy 이미지 트리거
 
         Args:
-            timeout: 최대 대기 시간 (초, 기본 3초)
-
-        Returns:
-            성공 여부 (True: 모든 이미지 로드 완료, False: 타임아웃 또는 일부 실패)
+            rounds: 위아래 왕복 횟수 (기본: 2)
+            scroll_pause: 각 스크롤 단계 사이 대기 시간 (초, 기본: 0.5)
         """
+        import time
+
         try:
-            # Selenium script timeout 설정 (무한 대기 방지)
-            original_timeout = self.driver.timeouts.script
-            self.driver.set_script_timeout(timeout + 1)  # JS timeout보다 1초 여유
+            print(f"   🔄 페이지 전체 스크롤 시작 ({rounds}회 왕복)...")
 
-            # JavaScript로 뷰포트 내 이미지 로드 상태 확인
-            wait_script = """
-            return new Promise((resolve) => {
-                const startTime = Date.now();
-                const timeout = arguments[0] * 1000;
+            # 현재 페이지의 전체 높이 확인
+            total_height = self.driver.execute_script("return document.body.scrollHeight")
+            viewport_height = self.driver.execute_script("return window.innerHeight")
 
-                function checkImages() {
-                    // 뷰포트 내 이미지만 확인
-                    const images = Array.from(document.querySelectorAll('img')).filter(img => {
-                        const rect = img.getBoundingClientRect();
-                        return rect.top >= 0 &&
-                               rect.bottom <= window.innerHeight &&
-                               rect.left >= 0 &&
-                               rect.right <= window.innerWidth;
-                    });
+            print(f"   📏 페이지 높이: {total_height}px, 뷰포트: {viewport_height}px")
 
-                    // 이미지가 없으면 바로 성공
-                    if (images.length === 0) {
-                        resolve({ success: true, count: 0 });
-                        return;
-                    }
+            for round_num in range(1, rounds + 1):
+                print(f"   📄 {round_num}회차 스크롤 중...")
 
-                    // 모든 이미지 로드 완료 체크
-                    const allLoaded = images.every(img => img.complete && img.naturalHeight > 0);
+                # 1. 맨 위에서 맨 아래로 천천히 스크롤
+                scroll_steps = 5  # 5단계로 나눠서 스크롤 (빠르게)
+                step_size = total_height // scroll_steps
 
-                    if (allLoaded) {
-                        resolve({ success: true, count: images.length });
-                    } else if (Date.now() - startTime > timeout) {
-                        // 타임아웃: 일부만 로드되어도 진행
-                        const pending = images.filter(img => !img.complete || img.naturalHeight === 0).length;
-                        resolve({ success: false, count: images.length, pending: pending });
-                    } else {
-                        // 재시도 (100ms 간격)
-                        setTimeout(checkImages, 100);
-                    }
-                }
+                # 맨 위로 이동
+                self.driver.execute_script("window.scrollTo(0, 0);")
+                time.sleep(scroll_pause)
 
-                checkImages();
-            });
-            """
+                # 아래로 단계별 스크롤
+                for step in range(1, scroll_steps + 1):
+                    scroll_to = min(step * step_size, total_height)
+                    self.driver.execute_script(f"window.scrollTo(0, {scroll_to});")
+                    time.sleep(scroll_pause)
 
-            result = self.driver.execute_async_script(wait_script, timeout)
+                # 맨 아래 확실히 도달
+                self.driver.execute_script("window.scrollTo(0, document.body.scrollHeight);")
+                time.sleep(scroll_pause)
 
-            # 원래 timeout 복원
-            self.driver.set_script_timeout(original_timeout)
+                # 2. 맨 아래에서 맨 위로 천천히 스크롤
+                current_height = self.driver.execute_script("return window.pageYOffset + window.innerHeight")
 
-            if result['success']:
-                print(f"   ✅ {result['count']}개 이미지 로드 완료")
-                return True
-            else:
-                print(f"   ⚠️  {result['pending']}/{result['count']}개 이미지 로드 지연 (계속 진행)")
-                # 일부 이미지가 로드되지 않아도 계속 진행
-                return False
+                # 위로 단계별 스크롤
+                for step in range(scroll_steps - 1, -1, -1):
+                    scroll_to = step * step_size
+                    self.driver.execute_script(f"window.scrollTo(0, {scroll_to});")
+                    time.sleep(scroll_pause)
+
+                # 맨 위 확실히 도달
+                self.driver.execute_script("window.scrollTo(0, 0);")
+                time.sleep(scroll_pause)
+
+            print(f"   ✅ 전체 페이지 스크롤 완료 ({rounds}회 왕복)")
+
+            # 스크롤 완료 후 약간의 대기 (이미지 로드 완료용)
+            # 스크롤 중에 이미 대부분의 이미지가 로드되었으므로 짧은 대기만 필요
+            time.sleep(1)
+            print(f"   ✅ 이미지 로드 완료")
 
         except Exception as e:
-            print(f"   ⚠️  이미지 로드 확인 실패: {e} (계속 진행)")
-            # 오류 발생 시에도 계속 진행
-            return False
-
-    def _trigger_lazy_images(self, container_element) -> None:
-        """
-        컨테이너 내 lazy loading 이미지 강제 로드
-
-        Args:
-            container_element: 상품 컨테이너 요소
-        """
-        try:
-            trigger_script = """
-            const container = arguments[0];
-
-            // 1. loading="lazy" 속성을 eager로 변경
-            const lazyImages = container.querySelectorAll('img[loading="lazy"]');
-            lazyImages.forEach(img => {
-                img.loading = 'eager';
-            });
-
-            // 2. data-src를 src로 강제 적용 (일부 구현 방식)
-            const dataSrcImages = container.querySelectorAll('img[data-src]');
-            dataSrcImages.forEach(img => {
-                if (!img.src || img.src.includes('placeholder')) {
-                    img.src = img.dataset.src;
-                }
-            });
-
-            // 3. IntersectionObserver 강제 트리거 (화면에 보이는 것처럼)
-            container.querySelectorAll('img').forEach(img => {
-                img.scrollIntoView({ block: 'nearest', inline: 'nearest' });
-            });
-
-            return lazyImages.length + dataSrcImages.length;
-            """
-
-            count = self.driver.execute_script(trigger_script, container_element)
-            if count > 0:
-                print(f"   🔄 {count}개 lazy 이미지 트리거 완료")
-
-        except Exception as e:
-            print(f"   ⚠️  Lazy loading 트리거 실패: {e}")
+            print(f"   ⚠️  전체 페이지 스크롤 실패: {e}")

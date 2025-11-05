@@ -14,6 +14,11 @@ import os
 from datetime import datetime, timedelta
 from pathlib import Path
 
+# VPN API 클라이언트
+from lib.modules.vpn_api_client import VPNAPIClient
+# SOCKS5 프록시 API 클라이언트
+from lib.modules.proxy_api_client import ProxyAPIClient
+
 
 # ============================================================
 # 스크립트 디렉토리 및 로그 디렉토리 설정
@@ -21,6 +26,65 @@ from pathlib import Path
 SCRIPT_DIR = Path(os.path.dirname(os.path.abspath(__file__)))
 LOGS_DIR = SCRIPT_DIR / "logs"
 LOGS_DIR.mkdir(exist_ok=True)
+
+
+# ============================================================
+# VPN 동시 할당 관리
+# ============================================================
+class VPNAllocationManager:
+    """
+    VPN 동시 할당 관리 클래스
+    - 하나의 VPN은 동시에 1개 워커만 사용 가능
+    - Local('L')도 동시에 1개 워커만 사용 가능
+    """
+
+    def __init__(self):
+        self.lock = threading.Lock()
+        self.allocated_vpns = set()  # 현재 사용 중인 VPN 목록
+
+    def allocate(self, vpn: str) -> bool:
+        """
+        VPN 할당 시도
+
+        Args:
+            vpn: VPN 번호 ('L', '0', '1', ...)
+
+        Returns:
+            할당 성공 여부
+        """
+        with self.lock:
+            if vpn in self.allocated_vpns:
+                return False  # 이미 사용 중
+            self.allocated_vpns.add(vpn)
+            return True
+
+    def release(self, vpn: str):
+        """
+        VPN 할당 해제
+
+        Args:
+            vpn: VPN 번호 ('L', '0', '1', ...)
+        """
+        with self.lock:
+            self.allocated_vpns.discard(vpn)
+
+    def get_allocated_count(self) -> int:
+        """현재 할당된 VPN 개수"""
+        with self.lock:
+            return len(self.allocated_vpns)
+
+    def get_available_vpns(self, all_vpns: list) -> list:
+        """
+        사용 가능한 VPN 목록 반환
+
+        Args:
+            all_vpns: 전체 VPN 목록
+
+        Returns:
+            사용 가능한 (아직 할당되지 않은) VPN 목록
+        """
+        with self.lock:
+            return [vpn for vpn in all_vpns if vpn not in self.allocated_vpns]
 
 
 def log_result(worker_id: int, vpn: str, chrome_version: str, success: bool, error_msg: str = None, screenshot_id: int = None):
@@ -43,11 +107,9 @@ def log_result(worker_id: int, vpn: str, chrome_version: str, success: bool, err
         # 타임스탬프
         timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
 
-        # VPN/Proxy 표시
+        # VPN 표시
         if vpn == 'L' or vpn is None:
             vpn_str = "Local"
-        elif vpn == 'P':
-            vpn_str = "Proxy"
         else:
             vpn_str = f"VPN {vpn}"
 
@@ -255,17 +317,25 @@ def cleanup_chrome_processes(vpn=None, instance_id=None):
 WINDOW_WIDTH = 1300       # Chrome 창 너비
 WINDOW_HEIGHT = 1200      # Chrome 창 높이
 
-# 워커별 창 위치 (수동 조정 가능)
+# 워커별 창 위치 (4x3 그리드, 4K 해상도 최적화)
+# 4K: 3840x2160, 창 크기: 1300x1200
+# 가로 간격: 850px (450px 겹침), 세로 간격: 640px (560px 겹침)
 WORKER_POSITIONS = {
-    1: {'x': 0,    'y': 0},
-    2: {'x': 1260, 'y': 0},
-    3: {'x': 2520, 'y': 0},
-    4: {'x': 0,    'y': 1200},
-    5: {'x': 1260, 'y': 1200},
-    6: {'x': 2520, 'y': 1200},
+    1:  {'x': 0,    'y': 0},
+    2:  {'x': 850,  'y': 0},
+    3:  {'x': 1700, 'y': 0},
+    4:  {'x': 2540, 'y': 0},
+    5:  {'x': 0,    'y': 640},
+    6:  {'x': 850,  'y': 640},
+    7:  {'x': 1700, 'y': 640},
+    8:  {'x': 2540, 'y': 640},
+    9:  {'x': 0,    'y': 1280},
+    10: {'x': 850,  'y': 1280},
+    11: {'x': 1700, 'y': 1280},
+    12: {'x': 2540, 'y': 1280},
 }
 
-MAX_WORKERS = 6           # 최대 워커 수
+MAX_WORKERS = 12          # 최대 워커 수 (4x3 그리드 레이아웃)
 
 
 class BlockedCombinationsManager:
@@ -459,7 +529,7 @@ def calculate_window_position(worker_id: int, window_width: int = None, window_h
     }
 
 
-def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode: str = None, vpn_list: list = None, window_config: dict = None, blocked_manager: BlockedCombinationsManager = None):
+def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode: str = None, vpn_list: list = None, window_config: dict = None, blocked_manager: BlockedCombinationsManager = None, vpn_allocation_manager: VPNAllocationManager = None, use_socks5: bool = False, socks5_client: ProxyAPIClient = None):
     """
     개별 워커 실행
 
@@ -468,9 +538,12 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
         iterations: 반복 횟수 (None이면 무한 루프)
         stats: 통계 객체
         adjust_mode: Adjust 모드 ("adjust", "adjust2", None)
-        vpn_list: VPN 번호 리스트 (None: VPN 사용 안 함, ['L', '0', '1'] 등)
+        vpn_list: VPN/SOCKS5 번호 리스트 (None: 사용 안 함, ['L', '0', '1'] 등)
         window_config: 창 설정 (width, height, x, y)
-        blocked_manager: 차단 조합 관리자 (VPN + Chrome 버전 조합 차단 관리)
+        blocked_manager: 차단 조합 관리자 (VPN/SOCKS5 + Chrome 버전 조합 차단 관리)
+        vpn_allocation_manager: VPN/SOCKS5 동시 할당 관리자 (중복 사용 방지)
+        use_socks5: SOCKS5 프록시 사용 여부 (True: SOCKS5, False: VPN)
+        socks5_client: SOCKS5 API 클라이언트 (use_socks5=True일 때 필수)
     """
     if iterations is None:
         print(f"[Worker-{worker_id}] 시작 - 무한 루프 (instance_id={worker_id})")
@@ -499,14 +572,10 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                 print(f"\n[Worker-{worker_id}] ❌ Chrome이 설치되어 있지 않습니다!")
                 break
 
+            # 1단계: 차단되지 않은 VPN 필터링
             if vpn_list and blocked_manager:
                 # 각 VPN에 대해 모든 버전이 차단되었는지 확인
                 for vpn in vpn_list:
-                    # 'P'(프록시)는 매번 다른 프록시를 선택하므로 차단 체크 제외
-                    if vpn == 'P':
-                        available_vpns.append(vpn)
-                        continue
-
                     blocked_count = 0
                     for ver in check_versions:
                         is_blocked, _ = blocked_manager.is_blocked(vpn, ver)
@@ -520,11 +589,15 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                 # blocked_manager가 없으면 모든 VPN 사용 가능
                 available_vpns = vpn_list.copy()
 
+            # 2단계: 사용 중이지 않은 VPN 필터링 (동시 할당 제한)
+            if vpn_allocation_manager and available_vpns:
+                available_vpns = vpn_allocation_manager.get_available_vpns(available_vpns)
+
             # 사용 가능한 VPN이 없으면 1분 대기 후 재시도
             if vpn_list and len(available_vpns) == 0:
                 print(f"\n[Worker-{worker_id}] 작업 {iteration_str}")
                 print("=" * 60)
-                print(f"   ⏸️  사용 가능한 VPN이 없음 (모든 VPN의 모든 Chrome 버전이 차단됨)")
+                print(f"   ⏸️  사용 가능한 VPN이 없음 (차단됨 또는 모두 사용 중)")
                 print(f"   ⏰ 1분 후 재시도...")
                 time.sleep(60)
                 # i를 증가시키지 않음 (재시도이므로 작업 횟수에 포함 안 함)
@@ -536,6 +609,10 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
             selected_vpn = None
             if available_vpns:
                 selected_vpn = random.choice(available_vpns)
+
+            # VPN 할당 (사용 중으로 표시)
+            if vpn_allocation_manager and selected_vpn:
+                vpn_allocation_manager.allocate(selected_vpn)
 
             # 선택된 VPN의 남아있는 Chrome 프로세스 정리
             cleanup_chrome_processes(vpn=selected_vpn, instance_id=worker_id)
@@ -561,12 +638,11 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                     selected_version = "random"
 
             # 작업 시작 메시지
+            mode_label = "SOCKS5" if use_socks5 else "VPN"
             if selected_vpn == 'L':
                 vpn_str = "Local"
-            elif selected_vpn == 'P':
-                vpn_str = "Proxy"
             elif selected_vpn:
-                vpn_str = f"VPN: {selected_vpn}"
+                vpn_str = f"{mode_label}: {selected_vpn}"
             else:
                 vpn_str = ""
 
@@ -581,10 +657,8 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
             if len(blocked_versions) > 0:
                 if selected_vpn == 'L':
                     vpn_display = "Local"
-                elif selected_vpn == 'P':
-                    vpn_display = "Proxy"
                 else:
-                    vpn_display = f"VPN {selected_vpn}"
+                    vpn_display = f"{mode_label} {selected_vpn}"
                 print(f"   ⚠️  차단된 Chrome 버전 건너뜀 ({vpn_display})")
                 for ver, remaining in blocked_versions:
                     print(f"      - Chrome {ver}: {remaining // 60}분 {remaining % 60}초 남음")
@@ -597,13 +671,19 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                 "--version", selected_version,
             ]
 
-            # VPN 또는 프록시 옵션 추가
-            if selected_vpn == 'P':
-                # 프록시 사용 (API에서 자동 선택)
-                cmd.append("--proxy")
-            elif selected_vpn and selected_vpn != 'L':
-                # VPN 사용
-                cmd.extend(["--vpn", str(selected_vpn)])
+            # VPN 또는 SOCKS5 옵션 추가
+            if selected_vpn and selected_vpn != 'L':
+                if use_socks5:
+                    # SOCKS5 프록시 사용
+                    socks5_ip = socks5_client.get_ip_by_socks5_number(int(selected_vpn))
+                    if socks5_ip:
+                        proxy_address = f"{socks5_ip}:{socks5_client.SOCKS5_PORT}"
+                        cmd.extend(["--proxy", proxy_address])
+                    else:
+                        print(f"   ⚠️  SOCKS5 {selected_vpn} IP 조회 실패, Local로 실행")
+                else:
+                    # VPN 사용
+                    cmd.extend(["--vpn", str(selected_vpn)])
 
             # Adjust 모드 옵션 추가 (선택 사항)
             if adjust_mode == "adjust":
@@ -660,7 +740,7 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
 
                 # 차단 목록에 추가 (timeout도 문제로 간주)
                 if blocked_manager:
-                    blocked_manager.add_blocked(selected_vpn, selected_version, "timeout")
+                    blocked_manager.mark_blocked(selected_vpn, selected_version, reason="timeout")
                     print(f"   ⚠️  차단 목록 추가: {selected_vpn or 'Local'} + Chrome {selected_version} (10분)")
 
                 # 다음 반복으로 진행 (작업 실패 처리)
@@ -765,6 +845,11 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                 error_msg=f"Exception: {str(e)}"
             )
 
+        finally:
+            # VPN 할당 해제 (모든 경우에 실행)
+            if vpn_allocation_manager and 'selected_vpn' in locals() and selected_vpn:
+                vpn_allocation_manager.release(selected_vpn)
+
     print(f"\n[Worker-{worker_id}] 모든 작업 완료")
 
 
@@ -774,38 +859,35 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 사용 예시:
-  # 무한 루프로 실행 (기본: 1 스레드)
+  # 6개 스레드로 무한 루프 실행 (VPN API 자동 조회)
   python3 run_workers.py
 
-  # 3개 스레드로 무한 루프 실행 (창 자동 배치)
-  python3 run_workers.py -t 3
+  # 12개 스레드로 무한 루프 실행
+  python3 run_workers.py -t 12
 
-  # 3개 스레드로 각각 10회 실행
-  python3 run_workers.py -t 3 -i 10
+  # 6개 스레드로 각각 100회 실행
+  python3 run_workers.py -t 6 -i 100
 
   # 창 크기 지정 (기본: 1300x1200)
-  python3 run_workers.py -t 3 -W 1000 -H 900
+  python3 run_workers.py -t 6 -W 1000 -H 900
 
-  # VPN 랜덤 선택 (0-5번 중 랜덤, 무한 루프)
-  python3 run_workers.py -t 3 --vpn=0,1,2,3,4,5
-
-  # 로컬 + VPN 0-5번 중 랜덤 선택 (L은 로컬/VPN 없음)
-  python3 run_workers.py -t 3 --vpn=L,0,1,2,3,4,5
-
-  # 프록시만 사용
-  python3 run_workers.py -t 3 --proxy
-
-  # 로컬 + VPN + 프록시 중 랜덤 선택
-  python3 run_workers.py -t 3 --vpn=L,0,1,2 --proxy
-
-창 배치 레이아웃 (최대 6개 스레드):
-  1  2  3
-  4  5  6
+창 배치 레이아웃 (최대 12개 스레드):
+  1   2   3   4
+  5   6   7   8
+  9  10  11  12
 
 네트워크 모드:
-  - Local (L): 직접 연결
-  - VPN (0-9): VPN 서버 경유
-  - Proxy (P): SOCKS5 프록시 경유 (API에서 자동 선택)
+  [VPN 모드 - 기본]
+  - VPN 목록은 API에서 자동 조회 (http://220.121.120.83/vpn_socks5/api/list.php)
+  - Local + VPN 0~N (API에서 가져온 IP 개수만큼)
+  - 각 VPN은 동시에 1개 워커만 사용 (동시 할당 제한)
+
+  [SOCKS5 모드 - --use-socks5]
+  - SOCKS5 목록은 API에서 자동 조회 (http://techb.kr/vpn_socks5/api/list.php?type=proxy)
+  - Local + SOCKS5 0~N (API에서 가져온 IP 개수만큼)
+  - 각 SOCKS5는 동시에 1개 워커만 사용 (동시 할당 제한)
+  - 포트: 10000 (공통)
+  - 권한 문제 없음 (tech 사용자로 실행)
 
 차단 조합 관리:
   - http2 차단 발생 시 VPN+Chrome 버전 조합을 자동으로 차단 목록에 추가
@@ -818,8 +900,8 @@ def main():
     parser.add_argument(
         "-t", "--threads",
         type=int,
-        default=1,
-        help="동시 실행 스레드 개수 (기본: 1)"
+        default=6,
+        help="동시 실행 스레드 개수 (기본: 6, 최대: 12)"
     )
 
     parser.add_argument(
@@ -842,19 +924,6 @@ def main():
     )
 
     parser.add_argument(
-        "--vpn",
-        type=str,
-        default=None,
-        help="VPN 번호 리스트 (콤마로 구분, 예: L,0,1,2 - L은 로컬/VPN 없음)"
-    )
-
-    parser.add_argument(
-        "--proxy",
-        action="store_true",
-        help="프록시 사용 (--vpn과 함께 사용 시 VPN 또는 프록시 중 랜덤 선택)"
-    )
-
-    parser.add_argument(
         "-W", "--window-width",
         type=int,
         default=1300,
@@ -866,6 +935,12 @@ def main():
         type=int,
         default=1200,
         help="창 높이 (기본: 1200px)"
+    )
+
+    parser.add_argument(
+        "--use-socks5",
+        action="store_true",
+        help="VPN 대신 SOCKS5 프록시 사용 (권한 문제 해결, tech 사용자로 실행)"
     )
 
     args = parser.parse_args()
@@ -896,22 +971,32 @@ def main():
     elif args.adjust2:
         adjust_mode = "adjust2"
 
-    # VPN 리스트 파싱
-    vpn_list = None
-    if args.vpn:
-        vpn_list = [vpn.strip().upper() for vpn in args.vpn.split(",")]
-        # 유효성 검사
-        for vpn in vpn_list:
-            if vpn != 'L' and not vpn.isdigit():
-                print(f"❌ 잘못된 VPN 값: {vpn} (L 또는 숫자만 가능)")
-                return
+    # VPN 또는 SOCKS5 목록 조회
+    if args.use_socks5:
+        # SOCKS5 프록시 사용
+        print("🔍 SOCKS5 프록시 목록 조회 중...")
+        try:
+            socks5_client = ProxyAPIClient()
+            vpn_list = socks5_client.get_socks5_list_with_local()
+            print(f"   ✓ SOCKS5 {len(vpn_list) - 1}개 + Local 감지 (총 {len(vpn_list)}개)")
+        except Exception as e:
+            print(f"   ⚠️  SOCKS5 API 조회 실패: {e}")
+            print(f"   ⚠️  Local 모드만 사용합니다")
+            vpn_list = ['L']
+    else:
+        # VPN 사용 (기본)
+        print("🔍 VPN 목록 조회 중...")
+        try:
+            vpn_client = VPNAPIClient()
+            vpn_list = vpn_client.get_vpn_list_with_local()
+            print(f"   ✓ VPN {len(vpn_list) - 1}개 + Local 감지 (총 {len(vpn_list)}개)")
+        except Exception as e:
+            print(f"   ⚠️  VPN API 조회 실패: {e}")
+            print(f"   ⚠️  Local 모드만 사용합니다")
+            vpn_list = ['L']
 
-    # 프록시 플래그가 있으면 VPN 리스트에 'P' 추가
-    if args.proxy:
-        if vpn_list is None:
-            vpn_list = ['P']  # 프록시만 사용
-        else:
-            vpn_list.append('P')  # VPN과 프록시 병행
+    # VPN 동시 할당 관리자 생성
+    vpn_allocation_manager = VPNAllocationManager()
 
     # 좀비 회수 스레드 시작 (daemon으로 백그라운드 실행)
     reaper_thread = threading.Thread(target=zombie_reaper_thread, daemon=True)
@@ -930,16 +1015,19 @@ def main():
         print(f"반복 횟수: {args.iterations} (스레드당)")
         print(f"총 작업 수: {args.threads * args.iterations}")
     if vpn_list:
-        # 'L'을 "Local", 'P'를 "Proxy"로 변환하여 표시
+        # 'L'을 "Local"로 변환하여 표시
         display_list = []
+        mode_label = "SOCKS5" if args.use_socks5 else "VPN"
         for v in vpn_list:
             if v == 'L':
                 display_list.append("Local")
-            elif v == 'P':
-                display_list.append("Proxy")
             else:
-                display_list.append(f"VPN-{v}")
-        print(f"네트워크 모드: {', '.join(display_list)} (랜덤 선택)")
+                display_list.append(f"{mode_label}-{v}")
+        print(f"네트워크 모드: {', '.join(display_list[:10])}", end='')
+        if len(vpn_list) > 10:
+            print(f" ... 외 {len(vpn_list) - 10}개 (랜덤 선택, 동시 할당 제한)")
+        else:
+            print(f" (랜덤 선택, 동시 할당 제한)")
     if adjust_mode:
         print(f"Adjust 모드: {adjust_mode}")
     print(f"시작 시간: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
@@ -979,7 +1067,7 @@ def main():
 
         thread = threading.Thread(
             target=run_worker,
-            args=(worker_id, args.iterations, stats, adjust_mode, vpn_list, window_config, blocked_manager),
+            args=(worker_id, args.iterations, stats, adjust_mode, vpn_list, window_config, blocked_manager, vpn_allocation_manager, args.use_socks5, socks5_client if args.use_socks5 else None),
             name=f"Worker-{worker_id}"
         )
         threads.append(thread)

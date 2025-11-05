@@ -78,19 +78,26 @@ else
 fi
 
 # ===================================================================
-# 3. 시스템 라이브러리 설치 (Chrome 실행에 필요)
+# 3. 시스템 라이브러리 설치 (Chrome 실행 + WireGuard)
 # ===================================================================
 
-log_step "3/8 시스템 라이브러리 설치 중..."
+log_step "3/9 시스템 라이브러리 설치 중..."
 echo ""
 
-log_info "Chrome 실행에 필요한 시스템 라이브러리 설치 중..."
+log_info "필수 시스템 라이브러리 설치 중..."
+log_info "  - WireGuard (VPN 키 풀용)"
+log_info "  - Chrome 실행 라이브러리"
+log_info "  - 네트워크 도구 (curl, jq 등)"
+echo ""
 
 sudo apt-get install -y \
+    wireguard \
+    wireguard-tools \
     wget \
     curl \
     unzip \
     jq \
+    git \
     xvfb \
     libglib2.0-0 \
     libnss3 \
@@ -118,22 +125,55 @@ sudo apt-get install -y \
     libcairo2 \
     libatspi2.0-0 \
     libxshmfence1 \
+    fonts-liberation \
+    libu2f-udev \
+    libvulkan1 \
+    libnspr4 \
+    xdg-utils \
     > /dev/null 2>&1
 
 log_success "시스템 라이브러리 설치 완료"
 
+# WireGuard 설치 확인
+if command -v wg-quick &> /dev/null; then
+    WG_VERSION=$(wg --version 2>&1 | head -1)
+    log_success "WireGuard 설치 확인: $WG_VERSION"
+else
+    log_error "WireGuard 설치 실패!"
+    exit 1
+fi
+
 # ===================================================================
-# 4. Python 패키지 설치
+# 4. Python 패키지 설치 (시스템 전역)
 # ===================================================================
 
-log_step "4/8 Python 패키지 설치 중..."
+log_step "4/9 Python 패키지 설치 중 (시스템 전역)..."
 echo ""
 
 if [ -f "$SCRIPT_DIR/requirements.txt" ]; then
     log_info "requirements.txt에서 패키지 설치 중..."
-    log_warn "시스템 전역 설치 (VPN 사용 시 필요)"
-    sudo pip3 install -r "$SCRIPT_DIR/requirements.txt"
+    log_warn "시스템 전역 설치 (모든 사용자가 접근 가능)"
+    echo ""
+
+    # Ubuntu 22.04+에서는 --break-system-packages 플래그 필요
+    if pip3 install --help | grep -q "break-system-packages"; then
+        sudo pip3 install -r "$SCRIPT_DIR/requirements.txt" --break-system-packages
+    else
+        sudo pip3 install -r "$SCRIPT_DIR/requirements.txt"
+    fi
+
     log_success "Python 패키지 설치 완료"
+
+    # 설치 검증
+    echo ""
+    log_info "설치된 패키지 확인 중..."
+    for pkg in undetected-chromedriver selenium Pillow requests pysocks psutil; do
+        if python3 -c "import ${pkg//-/_}" 2>/dev/null; then
+            log_success "  ✓ $pkg"
+        else
+            log_warn "  ⚠️  $pkg (설치 실패 또는 import 오류)"
+        fi
+    done
 else
     log_error "requirements.txt not found!"
     exit 1
@@ -143,7 +183,7 @@ fi
 # 5. Chrome 버전 설치
 # ===================================================================
 
-log_step "5/8 Chrome 버전 설치 중..."
+log_step "5/9 Chrome 버전 설치 중..."
 echo ""
 
 if [ -x "$SCRIPT_DIR/install-chrome-versions.sh" ]; then
@@ -158,24 +198,86 @@ fi
 # 6. 디렉토리 생성
 # ===================================================================
 
-log_step "6/8 필요한 디렉토리 생성 중..."
+log_step "6/9 필요한 디렉토리 생성 중..."
 echo ""
 
 mkdir -p "$SCRIPT_DIR/browser-profiles"
 mkdir -p "$SCRIPT_DIR/screenshots"
+mkdir -p "$SCRIPT_DIR/logs"
 mkdir -p "$SCRIPT_DIR/debug_logs"
+mkdir -p "/tmp/vpn_configs"
+
+chmod 755 "$SCRIPT_DIR/browser-profiles"
+chmod 755 "$SCRIPT_DIR/screenshots"
+chmod 755 "$SCRIPT_DIR/logs"
+chmod 755 "$SCRIPT_DIR/debug_logs"
+chmod 755 "/tmp/vpn_configs"
 
 log_success "디렉토리 생성 완료"
+log_info "  ✓ browser-profiles/ (브라우저 프로필)"
+log_info "  ✓ screenshots/ (스크린샷 저장)"
+log_info "  ✓ logs/ (워커 로그)"
+log_info "  ✓ debug_logs/ (디버그 로그)"
+log_info "  ✓ /tmp/vpn_configs/ (VPN 설정 임시 파일)"
 
 # ===================================================================
-# 7. 권한 설정
+# 7. VPN 키 풀 sudoers 설정 (WireGuard)
 # ===================================================================
 
-log_step "7/8 권한 설정 중..."
+log_step "7/9 VPN 키 풀 sudoers 설정 중..."
+echo ""
+
+SUDOERS_FILE="/etc/sudoers.d/vpn-pool-access"
+
+log_info "WireGuard wg-quick 명령어를 비밀번호 없이 실행하도록 설정 중..."
+log_info "사용자: $CURRENT_USER"
+echo ""
+
+# sudoers 파일 생성
+TEMP_SUDOERS=$(mktemp)
+
+cat > "$TEMP_SUDOERS" <<EOF
+# VPN 키 풀 시스템용 sudoers 설정
+# wg-quick 명령어를 비밀번호 없이 실행 가능
+# 생성일: $(date)
+
+# $CURRENT_USER 사용자가 wg-quick 명령어를 NOPASSWD로 실행 가능
+$CURRENT_USER ALL=(ALL) NOPASSWD: /usr/bin/wg-quick
+EOF
+
+# sudoers 문법 검사
+sudo visudo -c -f "$TEMP_SUDOERS" > /dev/null 2>&1
+
+if [ $? -eq 0 ]; then
+    log_success "sudoers 문법 검사 통과"
+    sudo cp "$TEMP_SUDOERS" "$SUDOERS_FILE"
+    sudo chmod 440 "$SUDOERS_FILE"
+    log_success "sudoers 파일 설치 완료: $SUDOERS_FILE"
+
+    # 테스트
+    if sudo -n wg-quick 2>&1 | grep -q "Usage"; then
+        log_success "wg-quick 비밀번호 없이 실행 가능 ✓"
+    else
+        log_warn "테스트 실패 (재로그인 필요할 수 있음)"
+    fi
+else
+    log_error "sudoers 문법 오류!"
+fi
+
+rm -f "$TEMP_SUDOERS"
+echo ""
+
+# ===================================================================
+# 8. 기존 권한 설정 (선택 사항 - 기존 VPN 방식용)
+# ===================================================================
+
+log_step "8/9 기존 권한 설정 (선택 사항)..."
 echo ""
 
 if [ -x "$SCRIPT_DIR/setup-permissions.sh" ]; then
-    log_info "권한 설정 스크립트 실행 중..."
+    log_info "기존 VPN 방식을 위한 권한 설정 스크립트 실행 중..."
+    log_info "(VPN 키 풀 방식에서는 불필요하지만 호환성을 위해 실행)"
+    echo ""
     "$SCRIPT_DIR/setup-permissions.sh"
     log_success "권한 설정 완료"
 else
@@ -183,32 +285,33 @@ else
 fi
 
 # ===================================================================
-# 8. VPN 설정 안내
+# 9. VPN 키 풀 서버 연결 테스트
 # ===================================================================
 
-log_step "8/8 VPN 설정 확인..."
+log_step "9/9 VPN 키 풀 서버 연결 테스트..."
 echo ""
 
-if command -v vpn &> /dev/null || [ -f "$HOME/vpn-ip-rotation/client/vpn" ]; then
-    log_success "VPN 클라이언트 발견!"
+VPN_API_SERVER="http://112.161.221.82:3000"
+log_info "VPN 키 풀 API 서버: $VPN_API_SERVER"
+echo ""
 
-    # sudoers 설정 확인
-    if [ -f "/etc/sudoers.d/vpn-access" ]; then
-        log_success "VPN sudoers 설정 완료"
-    else
-        log_warn "VPN sudoers 설정이 필요합니다"
-        log_info "다음 명령어로 설정하세요:"
-        echo ""
-        echo "  sudo ./setup-vpn-sudoers.sh"
-        echo ""
-    fi
+if curl -s --connect-timeout 5 "$VPN_API_SERVER/api/vpn/status" > /dev/null 2>&1; then
+    log_success "VPN 키 풀 서버 연결 성공!"
+
+    # 서버 상태 조회
+    STATUS_JSON=$(curl -s "$VPN_API_SERVER/api/vpn/status")
+    TOTAL_KEYS=$(echo "$STATUS_JSON" | jq -r '.statistics.total' 2>/dev/null || echo "?")
+    AVAILABLE_KEYS=$(echo "$STATUS_JSON" | jq -r '.statistics.available' 2>/dev/null || echo "?")
+
+    log_info "  📊 전체 키: $TOTAL_KEYS개"
+    log_info "  📊 사용 가능: $AVAILABLE_KEYS개"
 else
-    log_warn "VPN 클라이언트가 설치되지 않았습니다"
-    log_info "VPN 사용을 원하시면 다음 저장소를 참고하세요:"
-    echo ""
-    echo "  https://github.com/service0427/vpn"
-    echo ""
+    log_warn "VPN 키 풀 서버 연결 실패"
+    log_info "  서버가 실행 중인지 확인하세요"
+    log_info "  URL: $VPN_API_SERVER"
 fi
+
+echo ""
 
 # ===================================================================
 # 설치 완료
@@ -220,33 +323,42 @@ log_success "🎉 설치 완료!"
 echo "============================================================"
 echo ""
 
-# 테스트 명령어 안내
+# 설치된 구성 요소
 echo -e "${GREEN}✅ 설치된 구성 요소:${NC}"
 echo "  • Python $(python3 --version | awk '{print $2}')"
 echo "  • pip $(pip3 --version | awk '{print $2}')"
+echo "  • WireGuard $(wg --version 2>&1 | head -1)"
 echo "  • undetected-chromedriver $(pip3 show undetected-chromedriver 2>/dev/null | grep Version | awk '{print $2}')"
 echo "  • selenium $(pip3 show selenium 2>/dev/null | grep Version | awk '{print $2}')"
+echo "  • psutil $(pip3 show psutil 2>/dev/null | grep Version | awk '{print $2}')"
 echo "  • Chrome 130 (구버전 TLS)"
 echo "  • Chrome 144 (최신 버전)"
 echo ""
 
-echo -e "${CYAN}🚀 다음 단계:${NC}"
+echo -e "${CYAN}🚀 다음 단계 (바로 실행 가능):${NC}"
 echo ""
-echo "  1. Agent 테스트:"
-echo "     python3 agent.py --version 134 --close"
+echo "  1️⃣  멀티 워커 실행 (권장):"
+echo "     ${GREEN}python3 run_workers.py -t 6${NC}"
 echo ""
-echo "  2. 키워드 검색 테스트:"
-echo "     python3 agent.py --version 134 --keyword \"노트북\""
+echo "  2️⃣  단일 Agent 테스트:"
+echo "     ${GREEN}python3 agent.py --version 130 --keyword \"노트북\" --close${NC}"
 echo ""
-echo "  3. VPN 사용 (VPN 설치 후):"
-echo "     python3 agent.py --version 130 --vpn 0 --keyword \"게임\""
+echo "  3️⃣  VPN 키 풀 연결 테스트:"
+echo "     ${GREEN}bash test_vpn_connection.sh${NC}"
+echo ""
+
+echo -e "${BLUE}📚 추가 정보:${NC}"
+echo "  • VPN_POOL_GUIDE.md: VPN 키 풀 시스템 설명"
+echo "  • VPN_POOL_INTEGRATION_GUIDE.md: 통합 가이드"
+echo "  • CLAUDE.md: 프로젝트 전체 가이드"
 echo ""
 
 echo -e "${YELLOW}⚠️  참고사항:${NC}"
-echo "  • VPN 사용 시 setup-vpn-sudoers.sh 실행 필요"
-echo "  • 권한 오류 발생 시 setup-permissions.sh 재실행"
+echo "  • VPN 키 풀 방식 사용 (자동 키 할당/반납)"
+echo "  • 별도 VPN 사용자(vpn0~vpn35) 불필요"
+echo "  • ${CURRENT_USER} 사용자만으로 모든 작업 가능"
 echo "  • Chrome 버전 추가 설치: ./install-chrome-versions.sh [version]"
 echo ""
 
-log_info "설치 로그는 화면에 출력되었습니다"
+log_info "모든 설치가 완료되었습니다. 바로 run_workers.py를 실행할 수 있습니다!"
 echo ""

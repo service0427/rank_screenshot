@@ -398,7 +398,12 @@ WORKER_POSITIONS = {
     12: {'x': 2540, 'y': 1280},
 }
 
-MAX_WORKERS = 12          # 최대 워커 수 (4x3 그리드 레이아웃)
+MAX_WORKERS = 20          # 최대 워커 수 (이론적 최대치, 권장: 12-16개)
+                          # 실제 운영 시 시스템 리소스 고려 필요
+                          # - 12개: 시스템 사용자 제약 (vpn-worker-1 ~ vpn-worker-12)
+                          # - 16개: 안정적 운영 권장
+                          # - 20개: 하드웨어 여유 있을 때만
+                          # VPN 키 풀: 50개 용량 (5 서버 × 10 동시 접속)
 
 
 class BlockedCombinationsManager:
@@ -674,6 +679,22 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                     continue
                 # VPN 연결 성공 후 selected_vpn을 VPN 내부 IP로 업데이트 (로깅용)
                 vpn_internal_ip = vpn_conn.get_internal_ip()
+
+                # X11 권한 부여 (vpn-worker-N 사용자가 GUI 실행 가능하도록)
+                try:
+                    vpn_user = f"vpn-worker-{worker_id}"
+                    display = os.environ.get('DISPLAY', ':0')
+                    result = subprocess.run(
+                        ['xhost', f'+SI:localuser:{vpn_user}'],
+                        env={'DISPLAY': display},
+                        capture_output=True,
+                        text=True,
+                        timeout=5
+                    )
+                    if result.returncode == 0:
+                        print(f"   ✓ X11 권한 부여: {vpn_user}")
+                except Exception:
+                    pass  # 실패해도 계속 진행
             else:
                 vpn_internal_ip = None
 
@@ -729,18 +750,26 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
 
             # agent.py 실행 명령어 구성 (차단되지 않은 버전으로 실행)
             # ⚠️ VPN 키 풀 사용 시:
-            #    1. --vpn 옵션 제거 (네트워크 계층에서 이미 VPN 연결됨)
-            #    2. sudo -u vpn-worker-N으로 실행 (정책 라우팅 적용)
-            #    3. env HOME=/tmp DISPLAY=:0 설정 (Chrome/X11용)
+            #    1. sudo -u vpn-worker-N으로 직접 실행 (프로세스 격리)
+            #    2. agent.py에서 os.execvpe() 재실행하지 않음 (멀티스레드 충돌 방지)
+            #    3. X11, HOME, XDG 환경 변수 전달
+            current_user_home = os.path.expanduser('~')
+            display = os.environ.get('DISPLAY', ':0')
+
             if use_vpn and vpn_conn:
-                # VPN 키 풀: sudo -u vpn-worker-N env HOME=/tmp DISPLAY=:0 python3 agent.py ...
+                # VPN 키 풀: sudo -u vpn-worker-N env ... python3 agent.py ...
                 vpn_user = f"vpn-worker-{worker_id}"
                 cmd = [
                     "sudo", "-u", vpn_user,
-                    "env", "HOME=/tmp", "DISPLAY=:0",
+                    "env",
+                    "HOME=/tmp",
+                    f"DISPLAY={display}",
+                    f"XDG_CACHE_HOME={current_user_home}/.cache",
+                    f"XDG_DATA_HOME={current_user_home}/.local/share",
                     "python3", "agent.py",
                     "--work-api",
                     "--version", selected_version,
+                    "--vpn-pool-worker", str(worker_id),
                 ]
             else:
                 # Local: python3 agent.py ...

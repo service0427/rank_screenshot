@@ -418,6 +418,90 @@ Main → Search → Match → Highlight → Watermark → Capture → Upload
 
 ---
 
+## 🔐 VPN 키 풀 시스템
+
+### 개요
+
+**VPN 키 풀 (VPN Key Pool)**은 다중 워커 환경에서 VPN 자원을 동적으로 할당/관리하는 시스템입니다.
+
+### 시스템 사양
+
+| 항목 | 사양 |
+|------|------|
+| VPN 서버 | 5개 |
+| 서버당 동시 접속 | 10개 |
+| 총 VPN 용량 | 50개 |
+| 시스템 사용자 | vpn-worker-1 ~ vpn-worker-12 |
+| 워커 최대 이론치 | 20개 |
+| **권장 워커 수** | **12-16개** |
+
+### 실행 방법
+
+#### run_workers.py로 멀티 워커 실행
+
+```bash
+# 12개 워커로 작업 API 모드 실행 (VPN 키 풀 자동 할당)
+python3 run_workers.py --work-api --max-workers 12
+
+# 16개 워커로 실행 (권장 최대)
+python3 run_workers.py --work-api --max-workers 16
+
+# 특정 Chrome 버전 지정
+python3 run_workers.py --work-api --max-workers 12 --version 130
+```
+
+### 주요 특징
+
+- ✅ **동적 VPN 할당**: 워커별로 VPN 키를 자동 할당/반납
+- ✅ **정책 라우팅**: UID 기반 라우팅으로 메인 이더넷 보존
+- ✅ **프로세스 격리**: 각 워커는 독립적인 시스템 사용자로 실행
+- ✅ **프로필 분리**: 워커별 독립적인 Chrome 프로필
+- ✅ **ChromeDriver 격리**: 사용자별 ChromeDriver 경로로 충돌 방지
+
+### 아키텍처
+
+```
+run_workers.py
+    ↓
+Worker Thread 1-N
+    ↓
+VPNConnection (VPN 키 할당)
+    ↓
+WireGuard (wg-vpn-pool-N)
+    ↓
+Policy Routing (UID → Table)
+    ↓
+sudo -u vpn-worker-N python3 agent.py
+    ↓
+Chrome (독립 프로필)
+```
+
+### 테스트 검증 (2025-11-06)
+
+**50개 워커 테스트**:
+- VPN 키 할당: 50/50 (100%)
+- VPN 연결: 50/50 (100%)
+- 정책 라우팅: 50/50 (100%)
+- 브라우저 실행: 12/50 (시스템 사용자 제약)
+- 메인 이더넷: ✅ 보존 확인
+
+### 권장 운영 방식
+
+| 용도 | 워커 수 | 특징 |
+|------|---------|------|
+| 개발/테스트 | 1-2개 | 빠른 디버깅 |
+| 소규모 운영 | 4-8개 | 안정적, 모니터링 쉬움 |
+| **대규모 운영** | **12-16개** | **권장 최대** |
+| 이론적 최대 | 20개 | 하드웨어 여유 필요 |
+
+**중요**: 50개는 시스템 사용자 부족 및 리소스 과부하로 불가
+
+### 상세 문서
+
+- **CLAUDE.md**: VPN 키 풀 상세 아키텍처 및 문제 해결 가이드
+
+---
+
 ## 📖 문서
 
 - **CLAUDE.md**: Claude Code 작업 가이드 및 관리 원칙

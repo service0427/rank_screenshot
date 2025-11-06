@@ -121,7 +121,8 @@ def run_agent_selenium_uc(
     enable_rank_adjust: bool = False,  # Adjust 모드 (미래 개발용)
     adjust_mode: str = None,  # "adjust" 또는 "adjust2" (미래 개발용)
     min_rank: int = None,  # Adjust 모드용 최소 순위 (미래 개발용)
-    enable_main_filter: bool = False
+    enable_main_filter: bool = False,
+    vpn_pool_worker: int = None  # VPN 키 풀 워커 ID
 ):
     """
     Selenium + undetected-chromedriver 에이전트 실행 (리팩토링 버전)
@@ -153,8 +154,11 @@ def run_agent_selenium_uc(
     print(f"Detection Test: {test_detection}")
 
     vpn_num = os.environ.get('VPN_EXECUTED')
+
     if vpn_num is not None:
         print(f"🌐 VPN: ✅ wg{vpn_num}/vpn{vpn_num} (Enabled)")
+    elif vpn_pool_worker is not None:
+        print(f"🌐 VPN: ✅ VPN Pool Worker {vpn_pool_worker} (vpn-worker-{vpn_pool_worker})")
     else:
         print(f"🌐 Network: ❌ Local IP (Direct)")
     print("=" * 60 + "\n")
@@ -481,7 +485,8 @@ def run_work_api_mode(
     enable_rank_adjust: bool = False,
     adjust_mode: str = None,
     enable_main_filter: bool = False,
-    specified_screenshot_id: int = None
+    specified_screenshot_id: int = None,
+    vpn_pool_worker: int = None  # VPN 키 풀 워커 ID
 ):
     """
     작업 API 모드 실행
@@ -556,7 +561,8 @@ def run_work_api_mode(
         enable_rank_adjust=enable_rank_adjust,
         adjust_mode=adjust_mode,
         min_rank=min_rank,
-        enable_main_filter=enable_main_filter
+        enable_main_filter=enable_main_filter,
+        vpn_pool_worker=vpn_pool_worker
     )
 
     return success
@@ -702,6 +708,19 @@ Examples:
         default=None,
         metavar="N",
         help="VPN server number (0=wg0/vpn0, 1=wg1/vpn1, etc.)"
+    )
+
+    core_group.add_argument(
+        "--vpn-pool-worker",
+        type=int,
+        default=None,
+        metavar="N",
+        help=(
+            "VPN Pool worker ID (1-20 theoretical, 1-12 practical). "
+            "Uses vpn-worker-N system user. "
+            "VPN key is allocated/released automatically by run_workers.py. "
+            "Example: --vpn-pool-worker 1 (uses vpn-worker-1, UID 2001)"
+        )
     )
 
     core_group.add_argument(
@@ -932,6 +951,24 @@ Examples:
             os.execvpe(vpn_cmd, cmd, os.environ.copy())
             return
 
+    # === VPN 키 풀 재실행 로직 (제거됨) ===
+    # ⚠️ VPN 키 풀 모드에서는 agent.py에서 os.execvpe() 재실행하지 않음
+    #
+    # 이유:
+    # 1. run_workers.py에서 이미 sudo -u vpn-worker-N으로 올바른 사용자로 시작
+    # 2. 멀티스레드 환경에서 os.execvpe()는 전체 프로세스를 교체하여 문제 발생
+    # 3. VPN 연결은 run_workers.py의 VPNConnection 클래스가 관리
+    #
+    # VPN 키 풀 흐름:
+    # run_workers.py → VPNConnection.connect() → WireGuard 연결
+    # → sudo -u vpn-worker-N python3 agent.py --vpn-pool-worker N
+    # → agent.py는 이미 vpn-worker-N 사용자로 실행 중 (UID 2000+N)
+    # → 해당 UID의 모든 네트워크 트래픽은 정책 라우팅으로 VPN 경로 사용
+    #
+    # 단일 VPN 모드 (--vpn N)와의 차이:
+    # - 단일 VPN: agent.py가 os.execvpe()로 vpn 래퍼 통해 재실행
+    # - VPN 키 풀: run_workers.py가 처음부터 올바른 사용자로 실행
+
     # === 작업 API 모드 ===
     if args.work_api or ENABLE_WORK_API:
         print("\n🔄 작업 API 모드 활성화")
@@ -958,7 +995,8 @@ Examples:
             enable_rank_adjust=args.adjust,
             adjust_mode="adjust" if args.adjust else None,
             enable_main_filter=args.enable_main_filter,
-            specified_screenshot_id=specified_screenshot_id
+            specified_screenshot_id=specified_screenshot_id,
+            vpn_pool_worker=args.vpn_pool_worker
         )
         sys.exit(0 if success else 1)
 

@@ -363,7 +363,11 @@ class BrowserCoreUC:
         if chromedriver_bin.exists():
             # 워커별 ChromeDriver 복사본 생성 (멀티 워커 충돌 방지)
             import shutil
-            instance_driver_dir = Path(f"/tmp/chromedriver_instance_{self.instance_id}_v{version}")
+            import getpass
+            current_user = getpass.getuser()
+
+            # 사용자별 + instance별 분리 (vpn-worker-1, vpn-worker-2 등이 충돌하지 않도록)
+            instance_driver_dir = Path(f"/tmp/chromedriver_{current_user}_instance_{self.instance_id}_v{version}")
             instance_driver_dir.mkdir(parents=True, exist_ok=True)
             instance_driver_path = instance_driver_dir / "chromedriver"
 
@@ -372,7 +376,7 @@ class BrowserCoreUC:
                 shutil.copy2(chromedriver_bin, instance_driver_path)
                 # 실행 권한 부여
                 instance_driver_path.chmod(0o755)
-                print(f"   📋 ChromeDriver 복사: instance-{self.instance_id} 전용")
+                print(f"   📋 ChromeDriver 복사: {current_user}/instance-{self.instance_id} 전용")
 
             chromedriver_path = str(instance_driver_path)
 

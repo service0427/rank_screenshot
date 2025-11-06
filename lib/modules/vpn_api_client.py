@@ -244,12 +244,17 @@ class VPNConnection:
 
             for line in config_lines:
                 modified_lines.append(line)
-                # [Interface] 섹션 다음에 정책 라우팅 설정 추가
+                # [Interface] 섹션 다음에 DNS 및 정책 라우팅 설정 추가
                 if line.strip() == '[Interface]':
+                    modified_lines.append('DNS = 8.8.8.8, 8.8.4.4')
                     modified_lines.append(f'# VPN 키 풀 정책 라우팅 (UID {2000 + self.worker_id} → 테이블 {table_num})')
                     modified_lines.append('Table = off')
                     modified_lines.append(f'PostUp = ip route add default via {gateway} dev %i table {table_num}')
+                    # DNS 설정 (resolvectl 사용)
+                    modified_lines.append('PostUp = resolvectl dns %i 8.8.8.8 8.8.4.4')
+                    modified_lines.append('PostUp = resolvectl domain %i \\~.')
                     modified_lines.append(f'PostDown = ip route del default table {table_num} 2>/dev/null || true')
+                    modified_lines.append('PostDown = resolvectl revert %i || true')
 
             config_content = '\n'.join(modified_lines)
 

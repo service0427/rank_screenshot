@@ -290,6 +290,30 @@ class VPNConnection:
                 return False
 
             print(f"   ✅ VPN 연결 완료 ({self.vpn_key_data['internal_ip']})")
+
+            # 네트워크 안정화 대기 (게이트웨이 연결 확인)
+            import time
+            gateway_ip = "10.8.0.1"
+            max_attempts = 5
+            for attempt in range(1, max_attempts + 1):
+                # ping으로 게이트웨이 연결 확인
+                ping_result = subprocess.run(
+                    ['ping', '-c', '1', '-W', '2', gateway_ip],
+                    capture_output=True,
+                    text=True,
+                    timeout=3
+                )
+
+                if ping_result.returncode == 0:
+                    print(f"   ✓ 네트워크 안정화 완료 (게이트웨이 응답)")
+                    break
+                else:
+                    if attempt < max_attempts:
+                        print(f"   ⏳ 네트워크 안정화 대기 중... ({attempt}/{max_attempts})")
+                        time.sleep(1)
+                    else:
+                        print(f"   ⚠️  게이트웨이 응답 없음 (계속 진행)")
+
             return True
 
         except Exception as e:
@@ -335,6 +359,28 @@ class VPNConnection:
         except Exception as e:
             print(f"   ❌ WireGuard 종료 중 오류: {e}")
             success = False
+
+        # 메인 라우팅 보호: VPN 종료 후 메인 라우팅 확인
+        try:
+            main_gateway = "121.172.70.254"
+            check_route = subprocess.run(
+                ['ip', 'route', 'show'],
+                capture_output=True,
+                text=True,
+                timeout=5
+            )
+
+            if f"default via {main_gateway}" not in check_route.stdout:
+                print(f"   ⚠️  메인 라우팅 없음 - 복구 시도")
+                # 메인 라우팅 복구
+                subprocess.run(
+                    ['sudo', 'ip', 'route', 'add', 'default', 'via', main_gateway, 'dev', 'enp4s0'],
+                    capture_output=True,
+                    timeout=5
+                )
+                print(f"   ✓ 메인 라우팅 복구 완료")
+        except Exception as e:
+            print(f"   ⚠️  메인 라우팅 확인 실패: {e}")
 
         # 2. VPN 키 반납 (WireGuard 종료 실패해도 키는 반납)
         if self.vpn_key_data:

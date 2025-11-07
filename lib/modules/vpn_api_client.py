@@ -203,7 +203,7 @@ class VPNConnection:
         """
         self.worker_id = worker_id
         self.vpn_client = vpn_client
-        self.interface_name = f"wg-worker-{worker_id}"
+        self.interface_name = None  # IP 할당 후 동적으로 설정됨
         self.config_path = None
         self.vpn_key_data = None
 
@@ -223,7 +223,13 @@ class VPNConnection:
             if not self.vpn_key_data:
                 return False
 
-            # 2. WireGuard 설정 파일 생성 (정책 라우팅 적용)
+            # 2. 인터페이스 이름 생성 (내부 IP 기반)
+            # 예: 10.8.0.14 → wg-10-8-0-14
+            internal_ip = self.vpn_key_data['internal_ip']
+            ip_parts = internal_ip.replace('.', '-')
+            self.interface_name = f"wg-{ip_parts}"
+
+            # 3. WireGuard 설정 파일 생성 (정책 라우팅 적용)
             config_content = self.vpn_key_data['config']
 
             # ⚠️ 정책 라우팅 설정: 메인 이더넷 우선순위 보존
@@ -235,7 +241,6 @@ class VPNConnection:
 
             # Gateway 계산 (내부 IP 대역의 .1)
             # 예: 10.8.0.14/24 → 10.8.0.1
-            internal_ip = self.vpn_key_data['internal_ip']
             gateway = '.'.join(internal_ip.split('.')[:3]) + '.1'
 
             # WireGuard 설정 수정

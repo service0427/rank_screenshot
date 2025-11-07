@@ -226,11 +226,19 @@ class VPNConnection:
             if not self.vpn_key_data:
                 return False
 
-            # 2. 인터페이스 이름 생성 (내부 IP 기반)
-            # 예: 10.8.0.14 → wg-10-8-0-14
-            internal_ip = self.vpn_key_data['internal_ip']
-            ip_parts = internal_ip.replace('.', '-')
-            self.interface_name = f"wg-{ip_parts}"
+            # 2. 인터페이스 이름 생성 (외부 서버 IP 기반)
+            # server_ip = external IP (실제 VPN 서버 주소) → 어떤 VPN 서버인지 직관적
+            # internal_ip = VPN 서버 내부 할당 IP (10.8.0.X) → 서버마다 중복 가능
+            #
+            # WireGuard 인터페이스 이름 제약: 영문자로 시작, 15자 이하
+            # 전체 IP 사용: 222.100.114.123 → wgs-222-100-114-123 (19자, 너무 김)
+            # 해결: 마지막 2개 옥텟만 사용
+            # 예: 222.100.114.123 → wgs114-123 (10자)
+            #     175.210.218.190 → wgs218-190 (10자)
+            server_ip_external = self.vpn_key_data['server_ip']
+            octets = server_ip_external.split('.')
+            last_two = f"{octets[2]}-{octets[3]}"
+            self.interface_name = f"wgs{last_two}"
 
             # 3. WireGuard 설정 파일 생성 (정책 라우팅 적용)
             config_content = self.vpn_key_data['config']
@@ -244,6 +252,7 @@ class VPNConnection:
 
             # Gateway 계산 (내부 IP 대역의 .1)
             # 예: 10.8.0.14/24 → 10.8.0.1
+            internal_ip = self.vpn_key_data['internal_ip']
             gateway = '.'.join(internal_ip.split('.')[:3]) + '.1'
 
             # WireGuard 설정 수정
@@ -306,7 +315,8 @@ class VPNConnection:
                 interface=self.interface_name,
                 internal_ip=self.vpn_key_data['internal_ip'],
                 server_ip=self.vpn_key_data.get('server_ip'),
-                config_path=str(self.config_path)
+                config_path=str(self.config_path),
+                public_key=self.vpn_key_data.get('public_key')
             )
 
             # 네트워크 안정화 대기 (게이트웨이 연결 확인)

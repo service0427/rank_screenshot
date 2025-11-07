@@ -51,13 +51,16 @@ echo "$wg_interfaces" | while read iface; do
     config_path=""
 
     if [[ "$iface" =~ ^wg[0-9]+$ ]]; then
-        # wg0, wg1, ... → /home/tech/vpn/client/wgN.conf
+        # wg0, wg1, ... → /home/tech/vpn/client/wgN.conf (sync.sh 방식)
         config_path="/home/tech/vpn/client/${iface}.conf"
+    elif [[ "$iface" =~ ^wgs[0-9]+-[0-9]+$ ]]; then
+        # wgs218-190, wgs114-123, ... → /tmp/vpn_configs/wgsXXX-XXX.conf (VPN 키 풀, 서버 IP 기반)
+        config_path="/tmp/vpn_configs/${iface}.conf"
     elif [[ "$iface" =~ ^wg-worker-[0-9]+$ ]]; then
         # wg-worker-1, wg-worker-2, ... → /tmp/vpn_configs/wg-worker-N.conf (구버전)
         config_path="/tmp/vpn_configs/${iface}.conf"
     elif [[ "$iface" =~ ^wg-[0-9]+-[0-9]+-[0-9]+-[0-9]+$ ]]; then
-        # wg-10-8-0-14, ... → /tmp/vpn_configs/wg-10-8-0-14.conf (IP 기반 이름)
+        # wg-10-8-0-14, ... → /tmp/vpn_configs/wg-10-8-0-14.conf (내부 IP 기반, 구버전)
         config_path="/tmp/vpn_configs/${iface}.conf"
     elif [[ "$iface" =~ ^wg-vpn-pool-[0-9]+$ ]]; then
         # wg-vpn-pool-1, ... → /tmp/vpn_configs/wg-vpn-pool-N.conf

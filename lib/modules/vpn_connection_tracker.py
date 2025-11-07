@@ -64,7 +64,8 @@ class VPNConnectionTracker:
         interface: str,
         internal_ip: str,
         server_ip: str = None,
-        config_path: str = None
+        config_path: str = None,
+        public_key: str = None
     ):
         """
         VPN 연결 등록
@@ -75,6 +76,7 @@ class VPNConnectionTracker:
             internal_ip: 내부 IP (예: 10.8.0.14)
             server_ip: VPN 서버 IP (선택)
             config_path: 설정 파일 경로 (선택)
+            public_key: VPN 공개키 (선택, 키 반납용)
         """
         key = str(worker_id)
 
@@ -84,6 +86,7 @@ class VPNConnectionTracker:
             "internal_ip": internal_ip,
             "server_ip": server_ip,
             "config_path": config_path,
+            "public_key": public_key,
             "registered_at": datetime.now().isoformat(),
             "pid": subprocess.os.getpid()
         }

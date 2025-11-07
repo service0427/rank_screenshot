@@ -11,6 +11,9 @@ import os
 from typing import Dict, Optional
 from pathlib import Path
 
+# VPN 연결 추적 모듈
+from .vpn_connection_tracker import get_vpn_tracker
+
 
 class VPNAPIClient:
     """
@@ -296,6 +299,16 @@ class VPNConnection:
 
             print(f"   ✅ VPN 연결 완료 ({self.vpn_key_data['internal_ip']})")
 
+            # VPN 연결 추적 등록
+            tracker = get_vpn_tracker()
+            tracker.register_connection(
+                worker_id=self.worker_id,
+                interface=self.interface_name,
+                internal_ip=self.vpn_key_data['internal_ip'],
+                server_ip=self.vpn_key_data.get('server_ip'),
+                config_path=str(self.config_path)
+            )
+
             # 네트워크 안정화 대기 (게이트웨이 연결 확인)
             import time
             gateway_ip = "10.8.0.1"
@@ -391,6 +404,10 @@ class VPNConnection:
         if self.vpn_key_data:
             if not self.vpn_client.release_key(self.vpn_key_data['public_key']):
                 success = False
+
+        # 3. VPN 연결 추적 해제
+        tracker = get_vpn_tracker()
+        tracker.unregister_connection(worker_id=self.worker_id)
 
         return success
 

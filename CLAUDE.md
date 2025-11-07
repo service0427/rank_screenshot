@@ -586,10 +586,11 @@ ip route add default via 10.0.X.1 dev wg-vpn-pool-1 table 200
 ```
 
 #### 3. WireGuard 인터페이스
-- **인터페이스명**: wg-vpn-pool-N (N: 워커 ID)
-- **설정 파일**: /tmp/vpn_configs/worker-N.conf
+- **인터페이스명**: wg-X-X-X-X (내부 IP 기반, 예: wg-10-8-0-14)
+- **설정 파일**: /tmp/vpn_configs/wg-X-X-X-X.conf
 - **DNS 설정**: 8.8.8.8, 8.8.4.4
 - **Table = off**: 커널 자동 라우팅 비활성화 (정책 라우팅 사용)
+- **이름 장점**: 인터페이스 이름만 봐도 어떤 IP인지 즉시 파악 가능
 
 #### 4. 프로세스 격리
 - **시스템 사용자**: vpn-worker-1 ~ vpn-worker-12
@@ -695,7 +696,29 @@ ip rule add uidrange 2013-2013 table 212
 - 5개 서버에 9-11개 워커씩 균등 분배
 - IP 중복: 정상 (서버당 10개 동시 접속 허용)
 
+### 필수 설정 스크립트
+
+#### VPN 워커 홈 디렉토리 설정
+```bash
+./setup_vpn_worker_homes.sh
+```
+- vpn-worker-1 ~ vpn-worker-12 홈 디렉토리 생성
+- `.local`, `.cache` 디렉토리 생성 (undetected-chromedriver용)
+- Permission denied 오류 해결
+
+#### 모든 WireGuard 연결 정리
+```bash
+./cleanup_all_wg.sh
+```
+- `/home/tech/vpn/client` (sync.sh) 방식: wg0~wg36
+- VPN 키 풀 방식: wg-10-8-0-14, wg-10-8-0-18 등
+- 5단계 정리: wg-quick down → 강제 종료 → 라우팅 정리 → 설정 파일 삭제 → 메인 라우팅 복구
+
 ### 문제 해결
+
+#### "Permission denied: /home/vpn-worker-N" 오류
+- **원인**: VPN 워커 홈 디렉토리 미생성 또는 권한 부족
+- **해결**: `./setup_vpn_worker_homes.sh` 실행
 
 #### "unknown user vpn-worker-N" 오류
 - **원인**: 시스템 사용자 미생성
@@ -716,6 +739,10 @@ ip rule add uidrange 2013-2013 table 212
   PostUp = resolvectl domain %i ~.
   PostDown = resolvectl revert %i || true
   ```
+
+#### 이전 VPN 연결 간섭
+- **원인**: `/home/tech/vpn/client` (sync.sh)로 생성된 wg0~wg36 연결이 남아있음
+- **해결**: `./cleanup_all_wg.sh` 실행하여 모든 WireGuard 연결 정리
 
 ### 권장 운영 방식
 

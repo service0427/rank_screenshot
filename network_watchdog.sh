@@ -1,6 +1,6 @@
 #!/bin/bash
 #
-# 네트워크 와치독 (Network Watchdog)
+# 네트워크 와치독 (Network Watchdog) - wg101-112 전용
 # 메인 이더넷 연결이 끊기면 자동으로 복구
 #
 # 사용법:
@@ -8,6 +8,10 @@
 #
 # 백그라운드 실행:
 #   nohup ./network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &
+#
+# Crontab 설정:
+#   */5 * * * * pgrep -f "network_watchdog.sh" > /dev/null || nohup /home/tech/rank_screenshot/network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &
+#   @reboot sleep 30 && nohup /home/tech/rank_screenshot/network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &
 #
 
 # 설정
@@ -21,6 +25,10 @@ MAIN_INTERFACE="enp4s0"     # 메인 인터페이스
 # 상태 변수
 consecutive_failures=0
 log_file="/tmp/network_watchdog.log"
+
+# setup.sh에서 sudoers 설정 완료 (비밀번호 불필요)
+# - /etc/sudoers.d/wireguard: wg-quick NOPASSWD
+# - /etc/sudoers.d/vpn-workers: vpn-worker-N 전환 NOPASSWD
 
 # 로그 함수
 log() {
@@ -46,21 +54,22 @@ check_network() {
 restore_main_routing() {
     log "🚨 메인 라우팅 복구 시작..."
 
-    # 1. 모든 VPN 워커 인터페이스 종료
-    for iface in $(ip link show | grep -o 'wg-worker-[0-9]*'); do
+    # 1. 모든 WireGuard 인터페이스 종료 (wg로 시작하는 모든 인터페이스)
+    for iface in $(ip link show | grep -oE 'wg[0-9]+|wg-[a-z0-9-]+'); do
         log "   🔌 $iface 종료 중..."
         sudo ip link set "$iface" down 2>/dev/null || true
         sudo ip link delete "$iface" 2>/dev/null || true
     done
 
-    # 2. 테스트 VPN 인터페이스 종료
-    for iface in $(ip link show | grep -o 'test_vpn'); do
-        log "   🔌 $iface 종료 중..."
-        sudo ip link set "$iface" down 2>/dev/null || true
-        sudo ip link delete "$iface" 2>/dev/null || true
+    # 2. 정책 라우팅 테이블 정리 (101-112)
+    for table_num in {101..112}; do
+        if ip route show table $table_num 2>/dev/null | grep -q .; then
+            log "   🗑️  테이블 $table_num 정리"
+            sudo ip route flush table $table_num 2>/dev/null || true
+        fi
     done
 
-    # 3. 메인 라우팅 테이블 확인 및 복구
+    # 3. 메인 라우팅 확인 및 복구
     if ! ip route show | grep -q "default via $MAIN_GATEWAY"; then
         log "   ⚠️  기본 라우팅 없음 - 추가 중..."
         sudo ip route add default via "$MAIN_GATEWAY" dev "$MAIN_INTERFACE" 2>/dev/null || true
@@ -89,15 +98,23 @@ restore_main_routing() {
     log "✅ 메인 라우팅 복구 완료"
 }
 
-# 긴급 복구 함수 (모든 VPN 강제 종료)
+# 긴급 복구 함수 (5회 이상 실패 시)
 emergency_recovery() {
     log "🚨🚨🚨 긴급 복구 모드 시작 🚨🚨🚨"
 
     # 모든 WireGuard 인터페이스 강제 종료
-    for iface in $(ip link show | grep -o 'wg[0-9]*\|wg-[a-z-]*'); do
+    for iface in $(ip link show | grep -oE 'wg[0-9]+|wg-[a-z0-9-]+'); do
         log "   💥 $iface 강제 종료"
         sudo ip link set "$iface" down 2>/dev/null || true
         sudo ip link delete "$iface" 2>/dev/null || true
+    done
+
+    # 정책 라우팅 테이블 정리 (101-112)
+    for table_num in {101..112}; do
+        if ip route show table $table_num 2>/dev/null | grep -q .; then
+            log "   🗑️  테이블 $table_num 정리"
+            sudo ip route flush table $table_num 2>/dev/null || true
+        fi
     done
 
     # 메인 라우팅 복구
@@ -108,13 +125,14 @@ emergency_recovery() {
 
 # 메인 루프
 log "=========================================="
-log "🛡️  네트워크 와치독 시작"
+log "🛡️  네트워크 와치독 시작 (wg101-112)"
 log "=========================================="
 log "설정:"
 log "  - 체크 주기: ${CHECK_INTERVAL}초"
 log "  - Ping 대상: $PING_TARGET"
 log "  - 실패 임계값: $FAIL_THRESHOLD회 연속"
 log "  - 메인 게이트웨이: $MAIN_GATEWAY"
+log "  - 정책 라우팅: Table 101-112"
 log "=========================================="
 
 while true; do

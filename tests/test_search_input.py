@@ -7,7 +7,7 @@ import sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from lib.core.browser_core_uc import BrowserCoreUC
+from common.core.browser_core_uc import BrowserCoreUC
 import time
 
 

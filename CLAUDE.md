@@ -39,6 +39,119 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Coupang Agent V2는 Selenium + undetected-chromedriver를 사용한 자동화 탐지 우회 도구입니다. Chrome 130 (구버전 TLS) 및 144 (최신 버전)를 사용하여 TLS 핑거프린팅 다양성을 확보하고, VPN 통합으로 IP 우회 기능을 제공합니다.
 
+---
+
+## 📁 프로젝트 폴더 구조 (2025-11-07 업데이트)
+
+### 병렬 시스템 구조
+
+현재 프로젝트는 **UC (undetected-chromedriver)** 시스템을 운영하며, 향후 **nodriver** 전환을 위한 병렬 구조를 유지합니다.
+
+```
+rank_screenshot/
+├── common/                      # 🔄 공통 모듈 (UC + nodriver 공유)
+│   ├── vpn_api_client.py        # VPN 키 풀 클라이언트
+│   ├── vpn_connection_tracker.py
+│   ├── constants.py             # 전역 설정 (Config, ExecutionStatus 등)
+│   └── utils/                   # 공통 유틸리티
+│       ├── human_behavior_selenium.py
+│       ├── highlight_preset.py
+│       └── ... (6개 파일)
+│
+├── uc_lib/                      # 🔵 UC 시스템 (현재 운영 중)
+│   ├── core/                    # - undetected-chromedriver 래퍼
+│   │   └── browser_core_uc.py
+│   ├── modules/                 # - UC 전용 모듈
+│   │   ├── coupang_handler_selenium.py
+│   │   ├── product_finder.py
+│   │   └── screenshot_*.py
+│   └── workflows/               # - 검색 워크플로우
+│       └── search_workflow.py
+│
+├── no_lib/                      # 🟢 nodriver 시스템 (개발 예정)
+│   ├── core/                    # - 비동기 (async/await)
+│   ├── modules/                 # - CDP 직접 통신
+│   └── workflows/               # - 탐지율 개선 목표
+│
+├── uc_agent.py                  # 🔵 UC 메인 진입점 (사용 중)
+├── uc_run_workers.py            # 🔵 UC 멀티 워커 (사용 중)
+│
+├── no_agent.py                  # 🟢 nodriver 진입점 (미작성)
+├── no_run_workers.py            # 🟢 nodriver 멀티 워커 (미작성)
+│
+├── uc_browser-profiles/         # 🔵 UC 프로필 디렉토리
+│   └── wg10N/                   # wg101-112 사용자별 프로필
+│       ├── 130/                 # Chrome 130 프로필
+│       └── 144/                 # Chrome 144 프로필
+│
+├── no_browser-profiles/         # 🟢 nodriver 프로필 (미사용)
+│
+└── chrome-version/              # 공유 리소스
+    ├── 130/
+    └── 144/
+```
+
+### Import 경로 규칙
+
+**UC 시스템**:
+```python
+# UC 전용 모듈
+from uc_lib.core.browser_core_uc import BrowserCoreUC
+from uc_lib.modules.coupang_handler_selenium import CoupangHandlerSelenium
+
+# 공통 모듈
+from common.constants import Config, ExecutionStatus
+from common.vpn_api_client import VPNAPIClient
+from common.utils.human_behavior_selenium import HumanBehaviorSelenium
+```
+
+**nodriver 시스템** (미래):
+```python
+# nodriver 전용 모듈
+from no_lib.core.browser_core_no import BrowserCoreNo
+from no_lib.modules.coupang_handler_no import CoupangHandlerNo
+
+# 공통 모듈 (동일)
+from common.constants import Config
+from common.vpn_api_client import VPNAPIClient
+```
+
+### 폴더 접두사 의미
+
+| 접두사 | 의미 | 상태 | 설명 |
+|--------|------|------|------|
+| **uc_** | **U**ndetected-**C**hromedriver | 🔵 운영 중 | Selenium 기반, 안정적 |
+| **no_** | **no**driver | 🟢 개발 예정 | 비동기, CDP 직접 통신 |
+| **common/** | 공통 모듈 | 🔄 공유 | 두 시스템 모두 사용 |
+
+### 주요 파일 설명
+
+**현재 사용 중 (UC 시스템)**:
+- `uc_agent.py`: 단일 실행 진입점
+- `uc_run_workers.py`: 멀티 워커 오케스트레이션
+- `uc_lib/`: 모든 핵심 로직
+- `uc_browser-profiles/`: Chrome 프로필 저장소
+
+**미래 계획 (nodriver 시스템)**:
+- `no_agent.py`: 비동기 단일 실행
+- `no_run_workers.py`: multiprocessing 기반 멀티 워커
+- `no_lib/`: CDP 직접 통신 로직
+
+**공통**:
+- `common/`: VPN, constants, utils 공유
+- `chrome-version/`: Chrome 바이너리 공유
+- `screenshots/`, `logs/`: 출력 공유
+
+### 전환 계획
+
+1. **현재**: UC 시스템 안정화 및 개선
+2. **Phase 1**: nodriver 프로토타입 작성
+3. **Phase 2**: A/B 테스트 (탐지율 비교)
+4. **Phase 3**: nodriver 우세 시 완전 전환
+5. **정리**: uc_ 제거, no_ → 기본으로 변경
+
+---
+
 ## 설치
 
 ### 자동 설치 (권장)
@@ -166,15 +279,15 @@ cd ~/vpn-ip-rotation/client
 ```
 agent.py (메인 진입점)
     ↓
-BrowserCoreUC (lib/core/browser_core_uc.py)
+BrowserCoreUC (uc_lib/core/browser_core_uc.py)
     ↓ undetected-chromedriver 래퍼
     ↓ 버전별 프로필 관리
     ↓ 공유 캐시 시스템
     ↓
-CoupangHandlerSelenium (lib/modules/coupang_handler_selenium.py)
+CoupangHandlerSelenium (uc_lib/modules/coupang_handler_selenium.py)
     ↓ 쿠팡 특화 로직
     ↓
-HumanBehaviorSelenium (lib/utils/human_behavior_selenium.py)
+HumanBehaviorSelenium (common/utils/human_behavior_selenium.py)
     ↓ 사람 행동 시뮬레이션
 ```
 
@@ -366,29 +479,36 @@ python3 agent.py --version beta --vpn 0
 ## 디렉토리 구조
 
 ```
-agent/
-├── agent.py                      # 메인 진입점 (VPN 재실행 로직 포함)
-├── multi_browser_manager.py      # 버전 관리 및 브라우저 선택
+rank_screenshot/
+├── uc_agent.py                   # 메인 진입점 (VPN 재실행 로직 포함)
+├── uc_run_workers.py             # 멀티 워커 오케스트레이션
 ├── install-chrome-versions.sh    # Chrome 다운로드 스크립트
-├── lib/
+├── uc_lib/                       # UC 전용 모듈
 │   ├── core/
 │   │   └── browser_core_uc.py    # undetected-chromedriver 코어
 │   ├── modules/
-│   │   └── coupang_handler_selenium.py  # 쿠팡 핸들러
-│   ├── utils/
-│   │   └── human_behavior_selenium.py   # 사람 행동 시뮬레이션
-│   └── constants.py              # 상수 및 상태 정의
+│   │   ├── coupang_handler_selenium.py  # 쿠팡 핸들러
+│   │   ├── product_finder.py     # 상품 검색 및 매칭
+│   │   └── screenshot_*.py       # 스크린샷 관련
+│   └── workflows/
+│       └── search_workflow.py    # 검색 워크플로우
+├── common/                       # 공통 모듈
+│   ├── constants.py              # 상수 및 상태 정의
+│   ├── vpn_api_client.py         # VPN 관리
+│   └── utils/
+│       └── human_behavior_selenium.py   # 사람 행동 시뮬레이션
 ├── chrome-version/               # Chrome 바이너리
 │   ├── 130/                      # 구버전 TLS (127-130 대표)
 │   ├── 144/                      # 최신 버전 (131+ 대표)
 │   ├── beta/                     # Chrome Beta 채널
 │   ├── dev/                      # Chrome Dev 채널
 │   └── canary/                   # Chrome Canary 채널
-└── browser-profiles/             # 프로필 디렉토리
-    ├── chrome-{version}/         # 버전별 독립 프로필
-    │   ├── Default/              # 쿠키, 세션, 로컬스토리지
-    │   └── ...
-    └── shared-cache/             # 공유 캐시 (모든 버전)
+└── uc_browser-profiles/          # UC 프로필 디렉토리
+    └── wg10N/                    # wg101-112 사용자별 프로필
+        ├── 130/                  # Chrome 130 프로필
+        │   └── Default/          # 쿠키, 세션, 로컬스토리지
+        └── 144/                  # Chrome 144 프로필
+            └── Default/
 ```
 
 ## 의존성
@@ -435,16 +555,106 @@ core = BrowserCoreUC()
 core.clean_old_cache(max_age_hours=24)  # 24시간 이상 미사용 캐시 삭제
 ```
 
+## Import 경로 규칙 (2025-11-07 추가)
+
+### 전역 설정 기반 Import
+
+모든 import 경로는 [common/constants.py](common/constants.py)의 `ImportPaths` 클래스에서 관리됩니다. 프로젝트 구조 변경 시 이 클래스만 수정하면 됩니다.
+
+#### Import 경로 설정
+
+```python
+# common/constants.py
+class ImportPaths:
+    # 기본 모듈 경로
+    COMMON = "common"          # 공통 모듈
+    UC_LIB = "uc_lib"          # UC 전용 모듈
+    NODRIVER_LIB = "nodriver_lib"  # nodriver 전용 모듈
+
+    # 서브 경로
+    CORE = "core"
+    MODULES = "modules"
+    WORKFLOWS = "workflows"
+    UTILS = "utils"
+```
+
+#### 올바른 Import 예시
+
+```python
+# ✅ 공통 모듈 (모든 시스템에서 공유)
+from common.constants import Config, ExecutionStatus, ImportPaths
+from common.vpn_api_client import VPNAPIClient
+from common.utils.human_behavior_selenium import natural_typing
+
+# ✅ UC 전용 모듈
+from uc_lib.core.browser_core_uc import BrowserCoreUC
+from uc_lib.modules.coupang_handler_selenium import CoupangHandlerSelenium
+from uc_lib.modules.product_finder import ProductFinder
+from uc_lib.workflows.search_workflow import SearchWorkflow
+
+# ✅ nodriver 전용 모듈 (추후)
+from nodriver_lib.core.browser_core_nodriver import BrowserCoreNodriver
+from nodriver_lib.modules.coupang_handler_nodriver import CoupangHandlerNodriver
+```
+
+#### 잘못된 Import (절대 사용 금지)
+
+```python
+# ❌ lib는 이제 존재하지 않음
+from lib.constants import Config
+from lib.modules.vpn_api_client import VPNAPIClient
+
+# ❌ 상대 import로 공통 모듈 참조 (uc_lib에서 common을 참조할 때)
+from ..constants import Config  # 잘못됨!
+from ..utils.human_behavior_selenium import natural_typing  # 잘못됨!
+
+# ✅ 올바른 방법: 절대 import 사용
+from common.constants import Config
+from common.utils.human_behavior_selenium import natural_typing
+```
+
+#### Import 경로 변경이 필요한 경우
+
+프로젝트 구조가 변경되어 import 경로를 바꿔야 한다면:
+
+1. **[common/constants.py](common/constants.py) 수정**:
+   ```python
+   class ImportPaths:
+       COMMON = "새로운_경로"  # 여기만 수정
+       # ...
+   ```
+
+2. **전체 프로젝트에서 일괄 변경**:
+   ```bash
+   find . -name "*.py" -exec sed -i 's/from common\./from 새로운_경로./g' {} \;
+   ```
+
+3. **문서 업데이트**: 이 섹션의 예시도 함께 수정
+
+### 디렉토리 구조별 Import 규칙
+
+| 모듈 위치 | Common 참조 | UC_LIB 참조 | Nodriver 참조 |
+|-----------|-------------|-------------|---------------|
+| `common/` | 내부 import | ❌ 금지 | ❌ 금지 |
+| `uc_lib/` | `from common.` | 내부 import | ❌ 금지 |
+| `nodriver_lib/` | `from common.` | ❌ 금지 | 내부 import |
+| `tests/` | `from common.` | `from uc_lib.` | `from nodriver_lib.` |
+
+**중요**: `common/`은 UC와 nodriver 양쪽에서 모두 사용하는 공통 모듈이므로, `uc_lib/`나 `nodriver_lib/`를 참조하면 안 됩니다.
+
+---
+
 ## 코드 수정 시 주의사항
 
 **🇰🇷 주의: 코드 수정 설명도 반드시 한국어로 작성하세요! 🇰🇷**
 
-1. **VPN 재실행 로직 수정 금지**: `agent.py`의 `os.execvpe()` 패턴은 무한 루프 방지를 위해 `VPN_EXECUTED` 환경 변수 체크가 필수
-2. **캐시 경로 변경 시**: `shared_cache_dir`와 `user_data_dir`를 혼동하지 말 것
-3. **Chrome 옵션 추가 시**: WSL 호환성 플래그를 제거하지 말 것
-4. **프로필 초기화**: `clear_all_storage()`는 캐시를 삭제하지 않음 - 의도적 설계
-5. **한국어 설정**: `--lang=ko-KR`과 prefs의 `intl.accept_languages` 모두 필요
-6. **응답 언어**: 모든 설명, 분석, 오류 메시지는 한국어로 작성
+1. **Import 경로 규칙 준수**: 위의 "Import 경로 규칙" 섹션을 반드시 따를 것. `from lib.`는 절대 사용 금지.
+2. **VPN 재실행 로직 수정 금지**: `agent.py`의 `os.execvpe()` 패턴은 무한 루프 방지를 위해 `VPN_EXECUTED` 환경 변수 체크가 필수
+3. **캐시 경로 변경 시**: `shared_cache_dir`와 `user_data_dir`를 혼동하지 말 것
+4. **Chrome 옵션 추가 시**: WSL 호환성 플래그를 제거하지 말 것
+5. **프로필 초기화**: `clear_all_storage()`는 캐시를 삭제하지 않음 - 의도적 설계
+6. **한국어 설정**: `--lang=ko-KR`과 prefs의 `intl.accept_languages` 모두 필요
+7. **응답 언어**: 모든 설명, 분석, 오류 메시지는 한국어로 작성
 
 ## 성능 최적화 팁
 
@@ -547,18 +757,34 @@ app.run(host='0.0.0.0', port=8000)
 
 ---
 
-## 🔐 VPN 키 풀 시스템 (2025-11-06 통합)
+## 🔐 VPN 키 풀 시스템 (2025-11-07 업데이트: wg101-112)
 
 ### 시스템 개요
 
 **VPN 키 풀 (VPN Key Pool)**은 다중 워커 환경에서 VPN 자원을 동적으로 할당하고 관리하는 시스템입니다.
+
+### wg101-112 통합 네이밍 시스템 (2025-11-07)
+
+**핵심 설계**: 모든 식별자가 하나의 숫자로 통일됨
+
+| Worker ID | 사용자명 | UID | 라우팅 테이블 | 인터페이스 | 프로필 경로 |
+|-----------|----------|-----|---------------|------------|-------------|
+| 1 | wg101 | 1101 | 101 | wg101 | browser-profiles/wg101/{130,144} |
+| 2 | wg102 | 1102 | 102 | wg102 | browser-profiles/wg102/{130,144} |
+| ... | ... | ... | ... | ... | ... |
+| 12 | wg112 | 1112 | 112 | wg112 | browser-profiles/wg112/{130,144} |
+
+**장점**:
+- 숫자만 보면 모든 정보를 알 수 있음 (wg101 → UID 1101, Table 101)
+- UID 1101-1112는 시스템 서비스와 충돌하지 않음 (끝 3자리가 101-112로 일치)
+- 프로필 경로가 단순하고 직관적
 
 ### 시스템 사양
 
 - **VPN 서버 개수**: 5개
 - **VPN 서버당 동시 접속**: 10개
 - **총 VPN 용량**: 50개 동시 연결 지원
-- **시스템 사용자**: vpn-worker-1 ~ vpn-worker-12 (12명)
+- **시스템 사용자**: wg101 ~ wg112 (12명)
 - **워커 최대 이론치**: 20개 (권장: 16개)
 
 **중요**: 하드웨어 제약으로 실제 안정적 운영은 12~16개 워커 권장
@@ -571,18 +797,18 @@ app.run(host='0.0.0.0', port=8000)
 - **프로토콜**: HTTP REST API
 
 #### 2. 정책 라우팅 (Policy Routing)
-- **UID 기반 라우팅**: 각 vpn-worker-N 사용자마다 독립적인 라우팅 테이블
-- **UID 범위**: 2001-2050 (vpn-worker-1 = UID 2001, vpn-worker-2 = UID 2002, ...)
-- **라우팅 테이블**: 200-249 (UID 2001 → Table 200, UID 2002 → Table 201, ...)
+- **UID 기반 라우팅**: 각 wg10N 사용자마다 독립적인 라우팅 테이블
+- **UID 범위**: 1101-1112 (wg101 = UID 1101, wg102 = UID 1102, ...)
+- **라우팅 테이블**: 101-112 (UID 1101 → Table 101, UID 1102 → Table 102, ...)
 - **메인 이더넷 보존**: 일반 사용자(tech)는 메인 라우팅 사용
 
 **예시**:
 ```bash
-# vpn-worker-1 (UID 2001)의 트래픽은 라우팅 테이블 200 사용
-ip rule add uidrange 2001-2001 table 200
+# wg101 (UID 1101)의 트래픽은 라우팅 테이블 101 사용
+ip rule add uidrange 1101-1101 table 101
 
-# 라우팅 테이블 200은 wg-vpn-pool-1 인터페이스를 통해 VPN으로
-ip route add default via 10.0.X.1 dev wg-vpn-pool-1 table 200
+# 라우팅 테이블 101은 wg101 인터페이스를 통해 VPN으로
+ip route add default via 10.0.X.1 dev wg101 table 101
 ```
 
 #### 3. WireGuard 인터페이스
@@ -601,12 +827,12 @@ ip route add default via 10.0.X.1 dev wg-vpn-pool-1 table 200
 
 ### 주요 컴포넌트
 
-#### VPNAPIClient (`lib/modules/vpn_api_client.py`)
+#### VPNAPIClient (`common/vpn_api_client.py`)
 - VPN 키 풀 API와 통신
 - VPN 키 할당/반납 관리
 - WireGuard 설정 파일 생성 및 정책 라우팅 적용
 
-#### VPNConnection (`lib/modules/vpn_api_client.py`)
+#### VPNConnection (`common/vpn_api_client.py`)
 - 워커별 VPN 연결 관리
 - 자동 할당/해제
 - 내부 IP 조회
@@ -707,12 +933,80 @@ ip rule add uidrange 2013-2013 table 212
 - Permission denied 오류 해결
 
 #### 모든 WireGuard 연결 정리
+
+**기본 사용법**:
 ```bash
+# VPN 연결만 정리
 ./cleanup_all_wg.sh
+
+# VPN 연결 + Chrome 프로세스 종료
+./cleanup_all_wg.sh --kill-chrome
 ```
+
+**정리 대상**:
 - `/home/tech/vpn/client` (sync.sh) 방식: wg0~wg36
 - VPN 키 풀 방식: wg-10-8-0-14, wg-10-8-0-18 등
-- 5단계 정리: wg-quick down → 강제 종료 → 라우팅 정리 → 설정 파일 삭제 → 메인 라우팅 복구
+- wg101-112 방식: wg101~wg112 (새 시스템)
+
+**정리 단계**:
+1. **Phase 0** (선택적): Chrome 프로세스 종료 (`--kill-chrome` 옵션 시)
+2. **Phase 1**: wg-quick down으로 정상 종료 시도
+3. **Phase 2**: 남은 인터페이스 강제 종료 (ip link delete)
+4. **Phase 3**: 정책 라우팅 테이블 정리 (Table 101-112, 200-249)
+5. **Phase 4**: /tmp/vpn_configs 설정 파일 삭제
+6. **Phase 5**: 메인 라우팅 확인 및 복구
+
+**사용 시나리오**:
+- 워커 테스트 후 정리: `./cleanup_all_wg.sh`
+- 브라우저까지 완전 정리: `./cleanup_all_wg.sh --kill-chrome`
+- 네트워크 오류 복구: `./cleanup_all_wg.sh --kill-chrome` 후 재시작
+
+**초기 시스템 설정** (최초 1회만):
+```bash
+./cleanup_and_setup_wg101.sh
+```
+- wg101-112 사용자 생성 및 UID 설정
+- 홈 디렉토리 및 권한 설정
+- 프로필 디렉토리 생성
+- 이후에는 cleanup_all_wg.sh만 사용
+
+#### 네트워크 자동 복구 시스템 (Network Watchdog)
+```bash
+# 스크립트 위치
+/home/tech/rank_screenshot/network_watchdog.sh
+
+# 백그라운드 실행
+nohup ./network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &
+
+# 로그 확인
+tail -f /tmp/network_watchdog.log
+```
+
+**자동 실행 설정 (Crontab)**:
+```bash
+# 매 5분마다 와치독 프로세스가 살아있는지 확인하고 없으면 재시작
+*/5 * * * * pgrep -f "network_watchdog.sh" > /dev/null || nohup /home/tech/rank_screenshot/network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &
+
+# 시스템 재부팅 시 자동 시작
+@reboot sleep 30 && nohup /home/tech/rank_screenshot/network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &
+```
+
+**기능**:
+- 60초마다 네트워크 상태 체크 (8.8.8.8, 메인 게이트웨이)
+- 3회 연속 실패 시 자동 복구 시작
+- 5회 이상 실패 시 긴급 복구 모드 (모든 VPN 강제 종료)
+- wg101-112 인터페이스 인식 및 정리
+- 메인 라우팅 자동 복구
+- DNS 설정 복구
+- 자동 로깅 (/tmp/network_watchdog.log)
+
+**복구 절차**:
+1. wg101-112 인터페이스 종료
+2. 구버전 VPN 인터페이스 종료 (wg-worker-N, wgs218-190 등)
+3. 메인 라우팅 테이블 확인 및 복구
+4. DNS 설정 확인 및 복구
+5. 메인 인터페이스 재시작
+6. DHCP 갱신
 
 ### 문제 해결
 
@@ -731,18 +1025,26 @@ ip rule add uidrange 2013-2013 table 212
   instance_driver_dir = Path(f"/tmp/chromedriver_{current_user}_instance_{self.instance_id}_v{version}")
   ```
 
-#### DNS 해석 실패
-- **원인**: WireGuard 설정에 DNS 없음
-- **해결**: PostUp/PostDown에 resolvectl 명령 추가
-  ```bash
-  PostUp = resolvectl dns %i 8.8.8.8 8.8.4.4
-  PostUp = resolvectl domain %i ~.
-  PostDown = resolvectl revert %i || true
-  ```
+#### ERR_NETWORK_CHANGED 오류 (2025-11-07 해결 완료)
+- **원인**: 8개 워커 동시 실행 시 netlink 이벤트 폭주 + `resolvectl` DNS 설정으로 Chrome이 네트워크 변경 감지
+- **해결**:
+  1. ✅ **DNS 설정 제거** (가장 큰 효과): `resolvectl` 명령 모두 주석 처리 → UID 정책 라우팅으로 DNS도 자동 VPN 경로 사용
+  2. ✅ **워커 시작 지연**: 3초 → 0.3~0.7초 랜덤 지연으로 netlink 이벤트 분산
+  3. ✅ **안정 구간 대기**: ping 3회 + 0.5초 대기 후 Chrome 실행
+  4. ✅ **rp_filter 완화**: `net.ipv4.conf.all.rp_filter=2` 설정
+- **테스트 결과**: 2개 워커 100% 성공 (ERR_NETWORK_CHANGED 0건)
+- **상세 문서**: [docs/ERR_NETWORK_CHANGED_ISSUE.md](docs/ERR_NETWORK_CHANGED_ISSUE.md)
 
 #### 이전 VPN 연결 간섭
 - **원인**: `/home/tech/vpn/client` (sync.sh)로 생성된 wg0~wg36 연결이 남아있음
 - **해결**: `./cleanup_all_wg.sh` 실행하여 모든 WireGuard 연결 정리
+
+#### "Nexthop has invalid gateway" 오류 (2025-11-07 해결)
+- **원인**: VPN 서버마다 다른 Gateway 설정, 클라이언트가 `.1`로 하드코딩
+- **해결**: VPN API 서버에 `gateway` 필드 추가 (권장)
+  - API 응답: `{"gateway": "10.8.0.1", ...}`
+  - Fallback: 없으면 `internal_ip` 기반 계산
+  - 상세 가이드: `docs/VPN_API_GATEWAY_GUIDE.md`
 
 ### 권장 운영 방식
 
@@ -762,6 +1064,81 @@ ip rule add uidrange 2013-2013 table 212
 **이론적 최대**:
 - 20개 워커 (하드웨어 여유 있을 때)
 - 50개는 불가 (시스템 사용자 부족, 리소스 과부하)
+
+---
+
+## 💾 Cache 보존 전략 (2025-11-07 추가)
+
+### 개요
+
+**트래픽 32% 절감** + **시크릿 모드 효과** 동시 달성
+
+### 핵심 전략
+
+- ✅ **HTTP Cache 보존**: jQuery, Bootstrap 등 정적 리소스 재사용
+- ✅ **사용자 데이터 삭제**: Cookies, LocalStorage, History 제거
+- ✅ **매번 로그인 안됨**: 시크릿 모드 효과 유지
+- ✅ **트래픽 절감**: CSS/JS 재다운로드 불필요 (580KB/회 절약)
+
+### 구현 위치
+
+**파일**: `uc_lib/core/browser_core_uc.py`
+**함수**: `cleanup_profile_on_exit()` (Line 826-960)
+
+**변경 내용**:
+```python
+delete_dirs = [
+    # === 캐시는 보존 (트래픽 절감) ===
+    # "Cache" - jQuery, Bootstrap 등 재사용
+    # "Code Cache" - V8 바이트코드 재사용
+
+    # === GPU 캐시는 삭제 (핑거프린팅 위험) ===
+    "GPUCache",
+    "Service Worker",
+
+    # === 사용자 식별 정보 삭제 ===
+    "Local Storage",
+    "Session Storage",
+    "Cookies",
+    "History",
+    ...
+]
+```
+
+### 안전성 보증
+
+**HTTP Cache와 Cookies는 완전히 분리된 저장소**:
+- Cache: `Default/Cache/` (jQuery, CSS 등 정적 파일)
+- Cookies: `Default/Cookies` (로그인 세션)
+- LocalStorage: `Default/Local Storage/` (사용자 데이터)
+
+Cache를 보존해도 로그인 정보는 삭제됩니다!
+
+### 테스트 검증
+
+**10회 연속 테스트 결과**:
+- Cache 보존: 10/10 (100%)
+- Cookies 삭제: 10/10 (100%)
+- 완벽한 결과: 10/10 (100%)
+
+**스크립트**:
+- `test_cleanup_simple.py` - 기본 동작 확인
+- `test_10_iterations.py` - 10회 연속 테스트
+- `test_no_over_deletion.py` - 과도한 삭제 확인
+
+### 효과 (100회 실행 기준)
+
+| 항목 | 개선 전 | 개선 후 | 절감량 |
+|------|---------|---------|--------|
+| jQuery | 9.5MB | 95KB | 9.4MB |
+| Bootstrap | 23.5MB | 235KB | 23.3MB |
+| 기타 CDN | 25MB | 250KB | 24.8MB |
+| **총합** | **178MB** | **120.6MB** | **57.4MB (32%)** |
+
+### 상세 문서
+
+전체 기술 배경, FAQ, 테스트 결과는 다음 문서 참조:
+- **[docs/CACHE_PRESERVATION_GUIDE.md](docs/CACHE_PRESERVATION_GUIDE.md)**
 
 ---
 
@@ -788,7 +1165,7 @@ ip rule add uidrange 2013-2013 table 212
 
 #### 1. Dictionary 병합 순서 버그 (2025-11-03 발견)
 
-**위치**: `/home/tech/agent/lib/modules/product_finder.py:169-175`
+**위치**: `uc_lib/modules/product_finder.py:169-175`
 
 **문제**: `**url_params`의 위치에 따라 rank 값이 잘못 저장됨
 

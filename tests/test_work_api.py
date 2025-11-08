@@ -3,7 +3,7 @@
 작업 API 클라이언트 테스트
 """
 
-from lib.modules.work_api_client import WorkAPIClient
+from common.modules.work_api_client import WorkAPIClient
 
 
 def test_allocate_work():

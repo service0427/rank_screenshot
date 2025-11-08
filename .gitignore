@@ -46,3 +46,6 @@ videos/
 output/
 blocked_combinations.json
 logs/
+
+# Development (nodriver, win, research)
+dev/

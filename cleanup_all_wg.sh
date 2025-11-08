@@ -11,6 +11,10 @@
 #   ./cleanup_all_wg.sh
 #
 
+# setup.sh에서 sudoers 설정 완료 (비밀번호 불필요)
+# - /etc/sudoers.d/wireguard: wg-quick NOPASSWD
+# - /etc/sudoers.d/wg-workers: wg10N 전환 NOPASSWD
+
 echo "============================================"
 echo "🧹 모든 WireGuard 연결 정리"
 echo "============================================"
@@ -38,6 +42,18 @@ total_count=$(echo "$wg_interfaces" | wc -l)
 echo ""
 echo "총 $total_count 개의 인터페이스를 정리합니다..."
 
+# 0. Chrome 프로세스 종료 (선택적)
+if [ "$1" = "--kill-chrome" ]; then
+    echo ""
+    echo "🔨 Phase 0: Chrome 프로세스 종료 중..."
+    sudo pkill -9 chrome 2>/dev/null
+    if [ $? -eq 0 ]; then
+        echo "   ✅ Chrome 프로세스 종료 완료"
+    else
+        echo "   ℹ️  실행 중인 Chrome 프로세스 없음"
+    fi
+fi
+
 # 1. wg-quick down으로 정리 시도
 echo ""
 echo "🔌 Phase 1: wg-quick down으로 정리 중..."
@@ -50,7 +66,10 @@ echo "$wg_interfaces" | while read iface; do
     # - /tmp/vpn_configs/*.conf (VPN 키 풀 방식)
     config_path=""
 
-    if [[ "$iface" =~ ^wg[0-9]+$ ]]; then
+    if [[ "$iface" =~ ^wg10[1-9]$ ]] || [[ "$iface" =~ ^wg11[0-2]$ ]]; then
+        # wg101-112 (신버전, wg101-112 시스템)
+        config_path="/tmp/vpn_configs/${iface}.conf"
+    elif [[ "$iface" =~ ^wg[0-9]+$ ]]; then
         # wg0, wg1, ... → /home/tech/vpn/client/wgN.conf (sync.sh 방식)
         config_path="/home/tech/vpn/client/${iface}.conf"
     elif [[ "$iface" =~ ^wgs[0-9]+-[0-9]+$ ]]; then
@@ -104,13 +123,20 @@ else
     done
 fi
 
-# 3. 정책 라우팅 테이블 정리 (200~249)
+# 3. 정책 라우팅 테이블 정리 (101-112 우선, 200~249는 구버전)
 echo ""
 echo "🗑️  Phase 3: 정책 라우팅 테이블 정리 중..."
-for table_num in {200..249}; do
-    # 테이블에 route가 있는지 확인
+# wg101-112 시스템: Table 101-112
+for table_num in {101..112}; do
     if ip route show table $table_num 2>/dev/null | grep -q .; then
-        echo "   🗑️  테이블 $table_num 정리"
+        echo "   🗑️  테이블 $table_num 정리 (wg101-112)"
+        sudo ip route flush table $table_num 2>/dev/null
+    fi
+done
+# 구버전: Table 200-249
+for table_num in {200..249}; do
+    if ip route show table $table_num 2>/dev/null | grep -q .; then
+        echo "   🗑️  테이블 $table_num 정리 (구버전)"
         sudo ip route flush table $table_num 2>/dev/null
     fi
 done

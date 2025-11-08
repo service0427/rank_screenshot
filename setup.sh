@@ -3,6 +3,13 @@
 #######################################
 # Coupang Agent V2 자동 설치 스크립트
 # Ubuntu 22.04 LTS 지원
+#
+# 사용법:
+#   ./setup.sh           # UC 시스템만 설치 (기본)
+#   ./setup.sh --uc      # UC 시스템 설치
+#   ./setup.sh --no      # nodriver 시스템 설치 (미구현)
+#   ./setup.sh --win     # Windows UA 스푸핑 시스템 (미구현)
+#   ./setup.sh --all     # 모든 시스템 설치
 #######################################
 
 set -e
@@ -24,12 +31,69 @@ log_step() { echo -e "${CYAN}[STEP]${NC} $1"; }
 CURRENT_USER=$(whoami)
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# 설치 옵션 파싱
+INSTALL_UC=false
+INSTALL_NO=false
+INSTALL_WIN=false
+
+if [ $# -eq 0 ]; then
+    # 파라미터 없으면 UC만 설치 (기본)
+    INSTALL_UC=true
+else
+    for arg in "$@"; do
+        case $arg in
+            --uc)
+                INSTALL_UC=true
+                ;;
+            --no)
+                INSTALL_NO=true
+                ;;
+            --win)
+                INSTALL_WIN=true
+                ;;
+            --all)
+                INSTALL_UC=true
+                INSTALL_NO=true
+                INSTALL_WIN=true
+                ;;
+            --help|-h)
+                echo "사용법: $0 [옵션]"
+                echo ""
+                echo "옵션:"
+                echo "  (없음)     UC 시스템만 설치 (기본)"
+                echo "  --uc       UC (undetected-chromedriver) 시스템 설치"
+                echo "  --no       nodriver 시스템 설치 (미구현)"
+                echo "  --win      Windows UA 스푸핑 시스템 설치 (미구현)"
+                echo "  --all      모든 시스템 설치"
+                echo "  --help     이 도움말 표시"
+                exit 0
+                ;;
+            *)
+                log_error "알 수 없는 옵션: $arg"
+                echo "도움말: $0 --help"
+                exit 1
+                ;;
+        esac
+    done
+fi
+
 echo "============================================================"
 echo "🚀 Coupang Agent V2 자동 설치"
 echo "============================================================"
 echo ""
 log_info "Installation directory: $SCRIPT_DIR"
 log_info "Current user: $CURRENT_USER"
+echo ""
+log_info "설치 대상:"
+if [ "$INSTALL_UC" = true ]; then
+    echo "  ✓ UC (undetected-chromedriver)"
+fi
+if [ "$INSTALL_NO" = true ]; then
+    echo "  ✓ nodriver (미구현)"
+fi
+if [ "$INSTALL_WIN" = true ]; then
+    echo "  ✓ Windows UA 스푸핑 (미구현)"
+fi
 echo ""
 
 # ===================================================================
@@ -396,9 +460,9 @@ echo ""
 log_step "10/10 VPN 키 풀 워커 사용자 및 정책 라우팅 설정 중..."
 echo ""
 
-log_info "VPN 키 풀 시스템용 시스템 사용자 생성 (vpn-worker-1 ~ vpn-worker-12)"
-log_info "  UID 범위: 2001~2012"
-log_info "  라우팅 테이블: 200~211"
+log_info "VPN 키 풀 시스템용 시스템 사용자 생성 (wg101 ~ wg112)"
+log_info "  UID 범위: 1101~1112"
+log_info "  라우팅 테이블: 101~112"
 echo ""
 
 # VPN 워커 사용자 생성 및 정책 라우팅 설정
@@ -406,17 +470,23 @@ WORKERS_CREATED=0
 RULES_ADDED=0
 
 for i in {1..12}; do
-    uid=$((2000 + i))
-    username="vpn-worker-$i"
-    table_num=$((199 + i))
+    uid=$((1100 + i))          # Worker-1 → UID 1101, Worker-2 → UID 1102, ...
+    username="wg$uid"          # wg101, wg102, ..., wg112
+    table_num=$((100 + i))     # Table 101, 102, ..., 112
 
     # 사용자 생성 (이미 존재하면 스킵)
     if ! id "$username" &>/dev/null; then
-        # ⚠️ -m 옵션으로 홈 디렉토리 생성 (agent.py가 ~/.coupang_agent_profiles 사용)
+        # ⚠️ -m 옵션으로 홈 디렉토리 생성
+        # uc_run_workers.py가 브라우저 프로필을 /home/wg10N/ 아래에 저장
         sudo useradd -u $uid -m -s /bin/bash "$username" 2>/dev/null
         if [ $? -eq 0 ]; then
             ((WORKERS_CREATED++))
             log_info "  ✓ 사용자 생성: $username (UID $uid)"
+
+            # 브라우저 프로필 디렉토리 생성 및 권한 설정
+            sudo mkdir -p "$SCRIPT_DIR/uc_browser-profiles/$username"
+            sudo chown -R $username:$username "$SCRIPT_DIR/uc_browser-profiles/$username"
+            sudo chmod -R 755 "$SCRIPT_DIR/uc_browser-profiles/$username"
         fi
     else
         log_info "  ⊙ 사용자 존재: $username (UID $uid)"
@@ -426,6 +496,14 @@ for i in {1..12}; do
             sudo chown $username:$username "/home/$username"
             sudo chmod 755 "/home/$username"
             log_info "  ✓ 홈 디렉토리 생성: /home/$username"
+        fi
+
+        # 브라우저 프로필 디렉토리 확인 및 생성
+        if [ ! -d "$SCRIPT_DIR/uc_browser-profiles/$username" ]; then
+            sudo mkdir -p "$SCRIPT_DIR/uc_browser-profiles/$username"
+            sudo chown -R $username:$username "$SCRIPT_DIR/uc_browser-profiles/$username"
+            sudo chmod -R 755 "$SCRIPT_DIR/uc_browser-profiles/$username"
+            log_info "  ✓ 브라우저 프로필 디렉토리 생성: uc_browser-profiles/$username"
         fi
     fi
 
@@ -446,15 +524,15 @@ log_success "VPN 워커 설정 완료"
 log_info "  생성된 사용자: $WORKERS_CREATED개"
 log_info "  추가된 라우팅 규칙: $RULES_ADDED개"
 
-# sudoers 설정 (tech → vpn-worker-N 전환 가능)
-VPNWORKER_SUDOERS="/etc/sudoers.d/vpn-workers"
+# sudoers 설정 (tech → wg10N 전환 가능)
+VPNWORKER_SUDOERS="/etc/sudoers.d/wg-workers"
 
-log_info "sudoers 설정 중 (tech → vpn-worker-N 전환 권한)..."
+log_info "sudoers 설정 중 (tech → wg10N 전환 권한)..."
 
 # sudoers 파일 내용
-VPNWORKER_CONTENT="# VPN 키 풀 워커 전환 권한
-# tech 사용자가 vpn-worker-N 사용자로 전환 가능 (Chrome 프로세스용)
-$CURRENT_USER ALL=(vpn-worker-1,vpn-worker-2,vpn-worker-3,vpn-worker-4,vpn-worker-5,vpn-worker-6,vpn-worker-7,vpn-worker-8,vpn-worker-9,vpn-worker-10,vpn-worker-11,vpn-worker-12) NOPASSWD: ALL"
+VPNWORKER_CONTENT="# VPN 키 풀 워커 전환 권한 (wg101-112 시스템)
+# tech 사용자가 wg10N 사용자로 전환 가능 (Chrome 프로세스용)
+$CURRENT_USER ALL=(wg101,wg102,wg103,wg104,wg105,wg106,wg107,wg108,wg109,wg110,wg111,wg112) NOPASSWD: ALL"
 
 # 임시 파일 생성
 TMP_FILE2=$(mktemp)
@@ -470,6 +548,71 @@ else
 fi
 
 rm -f "$TMP_FILE2"
+
+echo ""
+
+# ===================================================================
+# 11/11 네트워크 와치독 자동 실행 설정
+# ===================================================================
+
+log_step "11/11 네트워크 와치독 자동 실행 설정 중..."
+echo ""
+
+WATCHDOG_SCRIPT="$SCRIPT_DIR/network_watchdog.sh"
+
+if [ -f "$WATCHDOG_SCRIPT" ]; then
+    log_info "네트워크 와치독 스크립트 확인: $WATCHDOG_SCRIPT"
+
+    # 실행 권한 부여
+    chmod +x "$WATCHDOG_SCRIPT"
+
+    # Crontab에 자동 실행 설정 추가
+    log_info "Crontab 설정 중..."
+
+    # 현재 crontab 백업
+    crontab -l > /tmp/crontab_backup_$$.txt 2>/dev/null || true
+
+    # 와치독 설정이 이미 있는지 확인
+    if crontab -l 2>/dev/null | grep -q "network_watchdog.sh"; then
+        log_info "  ⊙ 와치독 Crontab 설정 이미 존재"
+    else
+        # 새 crontab 설정 추가
+        (
+            crontab -l 2>/dev/null || true
+            echo ""
+            echo "# Network Watchdog - 네트워크 자동 복구 시스템"
+            echo "# 5분마다 와치독 프로세스 확인 및 재시작"
+            echo "*/5 * * * * pgrep -f \"network_watchdog.sh\" > /dev/null || nohup $WATCHDOG_SCRIPT > /tmp/network_watchdog.log 2>&1 &"
+            echo ""
+            echo "# 시스템 재부팅 시 자동 시작 (30초 대기 후)"
+            echo "@reboot sleep 30 && nohup $WATCHDOG_SCRIPT > /tmp/network_watchdog.log 2>&1 &"
+        ) | crontab -
+
+        log_success "  ✓ Crontab 설정 완료"
+        log_info "    - 5분마다 와치독 프로세스 확인"
+        log_info "    - 재부팅 시 자동 시작"
+    fi
+
+    # 와치독 즉시 시작
+    log_info "네트워크 와치독 시작 중..."
+
+    if pgrep -f "network_watchdog.sh" > /dev/null; then
+        log_info "  ⊙ 와치독 이미 실행 중"
+    else
+        nohup "$WATCHDOG_SCRIPT" > /tmp/network_watchdog.log 2>&1 &
+        sleep 2
+
+        if pgrep -f "network_watchdog.sh" > /dev/null; then
+            log_success "  ✓ 네트워크 와치독 시작 완료"
+            log_info "    로그: /tmp/network_watchdog.log"
+        else
+            log_warn "  ⚠️ 와치독 시작 실패 (수동 확인 필요)"
+        fi
+    fi
+else
+    log_warn "네트워크 와치독 스크립트 없음: $WATCHDOG_SCRIPT"
+    log_info "  수동으로 network_watchdog.sh를 실행하세요"
+fi
 
 echo ""
 
@@ -493,18 +636,19 @@ echo "  • selenium $(pip3 show selenium 2>/dev/null | grep Version | awk '{pri
 echo "  • psutil $(pip3 show psutil 2>/dev/null | grep Version | awk '{print $2}')"
 echo "  • Chrome 130 (구버전 TLS)"
 echo "  • Chrome 144 (최신 버전)"
+echo "  • Network Watchdog (자동 네트워크 복구 시스템)"
 echo ""
 
 echo -e "${CYAN}🚀 다음 단계 (바로 실행 가능):${NC}"
 echo ""
 echo "  1️⃣  멀티 워커 실행 (권장):"
-echo "     ${GREEN}python3 run_workers.py -t 6${NC}"
+echo "     ${GREEN}python3 uc_run_workers.py -t 6${NC}"
 echo ""
 echo "  2️⃣  단일 Agent 테스트:"
-echo "     ${GREEN}python3 agent.py --version 130 --keyword \"노트북\" --close${NC}"
+echo "     ${GREEN}python3 uc_agent.py --version 130 --keyword \"노트북\" --close${NC}"
 echo ""
-echo "  3️⃣  VPN 키 풀 연결 테스트:"
-echo "     ${GREEN}bash test_vpn_connection.sh${NC}"
+echo "  3️⃣  네트워크 와치독 로그 확인:"
+echo "     ${GREEN}tail -f /tmp/network_watchdog.log${NC}"
 echo ""
 
 echo -e "${BLUE}📚 추가 정보:${NC}"
@@ -515,10 +659,11 @@ echo ""
 
 echo -e "${YELLOW}⚠️  참고사항:${NC}"
 echo "  • VPN 키 풀 방식 사용 (자동 키 할당/반납)"
-echo "  • 별도 VPN 사용자(vpn0~vpn35) 불필요"
+echo "  • 네트워크 와치독 자동 실행 (5분마다 체크, 재부팅 시 자동 시작)"
+echo "  • 네트워크 장애 시 자동 복구 (VPN 연결 정리 + 메인 라우팅 복구)"
 echo "  • ${CURRENT_USER} 사용자만으로 모든 작업 가능"
 echo "  • Chrome 버전 추가 설치: ./install-chrome-versions.sh [version]"
 echo ""
 
-log_info "모든 설치가 완료되었습니다. 바로 run_workers.py를 실행할 수 있습니다!"
+log_info "모든 설치가 완료되었습니다. 바로 uc_run_workers.py를 실행할 수 있습니다!"
 echo ""

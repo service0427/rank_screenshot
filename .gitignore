@@ -51,3 +51,5 @@ logs/
 
 # Development (nodriver, win, research)
 dev/
+docs/
+tests/

@@ -572,22 +572,19 @@ if [ -f "$WATCHDOG_SCRIPT" ]; then
     # 현재 crontab 백업
     crontab -l > /tmp/crontab_backup_$$.txt 2>/dev/null || true
 
-    # 와치독 설정이 이미 있는지 확인
-    if crontab -l 2>/dev/null | grep -q "network_watchdog.sh"; then
-        log_info "  ⊙ 와치독 Crontab 설정 이미 존재"
-    else
-        # 새 crontab 설정 추가 (1분 단위 체크)
-        (
-            crontab -l 2>/dev/null || true
-            echo ""
-            echo "# 네트워크 와치독 - 1분마다 네트워크 상태 체크"
-            echo "* * * * * $WATCHDOG_SCRIPT >> /tmp/network_watchdog.log 2>&1"
-        ) | crontab -
+    # 기존 와치독 설정 제거 후 새 설정 추가 (1분 단위 체크)
+    log_info "Crontab에서 와치독 설정 업데이트 중..."
+    (
+        # 기존 watchdog 관련 라인 제거
+        crontab -l 2>/dev/null | grep -v "network_watchdog.sh" || true
+        echo ""
+        echo "# 네트워크 와치독 - 1분마다 네트워크 상태 체크"
+        echo "* * * * * $WATCHDOG_SCRIPT >> /tmp/network_watchdog.log 2>&1"
+    ) | crontab -
 
-        log_success "  ✓ Crontab 설정 완료"
-        log_info "    - 1분마다 네트워크 상태 체크"
-        log_info "    - 경로: $WATCHDOG_SCRIPT"
-    fi
+    log_success "  ✓ Crontab 설정 완료"
+    log_info "    - 1분마다 네트워크 상태 체크"
+    log_info "    - 경로: $WATCHDOG_SCRIPT"
 
     # 와치독 즉시 실행 (1회)
     log_info "네트워크 와치독 초기 실행 중..."

@@ -114,22 +114,16 @@ class ScreenshotCapturer:
         # screenshots/YYYY/MM/DD/
         year_month_day_dir = self.base_dir / now.strftime("%Y") / now.strftime("%m") / now.strftime("%d")
 
-        # umask를 임시로 0으로 설정하여 디렉토리를 777 권한으로 생성
-        old_umask = os.umask(0)
-        try:
-            # os.makedirs()는 mode 파라미터를 제대로 적용함 (pathlib.mkdir()는 적용 안 됨)
-            os.makedirs(str(year_month_day_dir), mode=0o777, exist_ok=True)
-        finally:
-            # umask 복원
-            os.umask(old_umask)
+        # 디렉토리 생성 (일단 기본 권한으로)
+        os.makedirs(str(year_month_day_dir), exist_ok=True)
 
-        # 이미 존재하는 디렉토리의 경우 chmod로 권한 보정
-        # (다른 사용자가 생성한 디렉토리도 모두가 쓸 수 있도록)
+        # 생성 직후 명시적으로 chmod 777 설정 (umask 무시)
+        # 이 방법이 가장 확실함
         try:
-            os.chmod(year_month_day_dir, 0o777)  # DD
-            os.chmod(year_month_day_dir.parent, 0o777)  # MM
-            os.chmod(year_month_day_dir.parent.parent, 0o777)  # YYYY
             os.chmod(self.base_dir, 0o777)  # screenshots
+            os.chmod(year_month_day_dir.parent.parent, 0o777)  # YYYY
+            os.chmod(year_month_day_dir.parent, 0o777)  # MM
+            os.chmod(year_month_day_dir, 0o777)  # DD
         except (PermissionError, OSError):
             # 다른 사용자 소유 디렉토리는 권한 변경 불가 (무시)
             pass

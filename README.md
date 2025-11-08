@@ -43,11 +43,11 @@ cd rank_screenshot && ./setup.sh
 
 **설치 후 실행:**
 ```bash
-# 6개 워커로 멀티 실행
-python3 uc_run_workers.py -t 6
+# 6개 워커로 멀티 실행 (핑거프린트 프리셋 포함)
+python3 uc_run_workers.py -t 6 --fingerprint-preset full
 
-# 단일 테스트
-python3 uc_agent.py --version 130 --keyword "노트북" --close
+# 단일 테스트 (핑거프린트 프리셋 포함)
+python3 uc_agent.py --version 130 --keyword "노트북" --fingerprint-preset full --close
 ```
 
 ---
@@ -114,14 +114,14 @@ VPN과 함께 사용하는 경우 권한 설정이 필요합니다:
 **VPN 키 풀을 사용한 동시 다중 작업**:
 
 ```bash
-# 기본 실행 (6개 워커)
-python3 uc_run_workers.py -t 6
+# 기본 실행 (6개 워커, 핑거프린트 프리셋 포함)
+python3 uc_run_workers.py -t 6 --fingerprint-preset full
 
-# 최대 워커 (12개)
-python3 uc_run_workers.py -t 12
+# 최대 워커 (12개, 핑거프린트 프리셋 포함)
+python3 uc_run_workers.py -t 12 --fingerprint-preset full
 
-# 특정 Chrome 버전 지정
-python3 uc_run_workers.py -t 6 --version 130
+# 특정 Chrome 버전 지정 (핑거프린트 프리셋 포함)
+python3 uc_run_workers.py -t 6 --version 130 --fingerprint-preset full
 ```
 
 **특징**:
@@ -136,30 +136,33 @@ python3 uc_run_workers.py -t 6 --version 130
 **개별 Chrome 버전 테스트**:
 
 ```bash
-# Chrome 130 테스트
-python3 uc_agent.py --version 130 --keyword "노트북" --close
+# Chrome 130 테스트 (핑거프린트 프리셋 포함)
+python3 uc_agent.py --version 130 --keyword "노트북" --fingerprint-preset full --close
 
-# Chrome 144 테스트
-python3 uc_agent.py --version 144 --keyword "게임" --close
+# Chrome 144 테스트 (핑거프린트 프리셋 포함)
+python3 uc_agent.py --version 144 --keyword "게임" --fingerprint-preset full --close
 
-# 자동 종료 없이 실행
-python3 uc_agent.py --version 130 --keyword "노트북"
+# 자동 종료 없이 실행 (핑거프린트 프리셋 포함)
+python3 uc_agent.py --version 130 --keyword "노트북" --fingerprint-preset full
 ```
 
 **명령행 옵션**:
 ```bash
-# 특정 버전 지정
-python3 uc_agent.py --version 134
-python3 uc_agent.py --version beta
+# 핑거프린트 프리셋 옵션
+--fingerprint-preset [none|minimal|medium1|medium2|full]
 
-# 키워드 지정
-python3 uc_agent.py --version 134 --keyword "게임"
+# 특정 버전 지정 (핑거프린트 프리셋 포함)
+python3 uc_agent.py --version 134 --fingerprint-preset full
+python3 uc_agent.py --version beta --fingerprint-preset full
 
-# 자동 종료 (3초 후)
-python3 uc_agent.py --version 134 --close
+# 키워드 지정 (핑거프린트 프리셋 포함)
+python3 uc_agent.py --version 134 --keyword "게임" --fingerprint-preset full
 
-# 탐지 테스트 실행
-python3 uc_agent.py --version 134 --test-detection
+# 자동 종료 (3초 후, 핑거프린트 프리셋 포함)
+python3 uc_agent.py --version 134 --fingerprint-preset full --close
+
+# 탐지 테스트 실행 (핑거프린트 프리셋 포함)
+python3 uc_agent.py --version 134 --fingerprint-preset full --test-detection
 ```
 
 ### VPN 키 풀 시스템

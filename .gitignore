@@ -49,14 +49,10 @@ output/
 blocked_combinations.json
 logs/
 
-# Development (nodriver, win, research)
+# Development
 dev/
-docs/
 tests/
 
-# nodriver 연구 중 (푸시 제외)
-no_lib/
-no_browser-profiles/
-no_test_*.py
-requirements-nodriver.txt
-NODRIVER_WINDOWS_TLS_RESEARCH.md
+# tshark 캡처 파일
+*.pcap
+*.pcapng

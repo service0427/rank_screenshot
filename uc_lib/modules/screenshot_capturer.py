@@ -114,18 +114,25 @@ class ScreenshotCapturer:
         # screenshots/YYYY/MM/DD/
         year_month_day_dir = self.base_dir / now.strftime("%Y") / now.strftime("%m") / now.strftime("%d")
 
-        # 디렉토리 생성 (VPN 사용자도 쓸 수 있도록 777 권한)
-        year_month_day_dir.mkdir(parents=True, exist_ok=True)
-
-        # 명시적으로 권한 설정 (umask 무시, VPN 사용자도 쓸 수 있도록)
-        # VPN 사용자는 tech 소유 디렉토리 권한 변경 불가하므로 실패 시 무시
+        # umask를 임시로 0으로 설정하여 디렉토리를 777 권한으로 생성
+        old_umask = os.umask(0)
         try:
-            os.chmod(year_month_day_dir, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # 777
-            # 상위 디렉토리도 설정 (YYYY, MM)
-            os.chmod(year_month_day_dir.parent, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # MM
-            os.chmod(year_month_day_dir.parent.parent, stat.S_IRWXU | stat.S_IRWXG | stat.S_IRWXO)  # YYYY
-        except PermissionError:
-            pass  # VPN 사용자는 권한 변경 불가, tech 사용자가 setup-permissions.sh 실행 필요
+            # 디렉토리 생성 (mode=0o777로 명시)
+            year_month_day_dir.mkdir(parents=True, exist_ok=True, mode=0o777)
+
+            # exist_ok=True로 이미 존재하는 디렉토리의 경우 chmod로 권한 보정
+            # (다른 사용자가 생성한 디렉토리도 모두가 쓸 수 있도록)
+            try:
+                os.chmod(year_month_day_dir, 0o777)  # DD
+                os.chmod(year_month_day_dir.parent, 0o777)  # MM
+                os.chmod(year_month_day_dir.parent.parent, 0o777)  # YYYY
+                os.chmod(self.base_dir, 0o777)  # screenshots
+            except (PermissionError, OSError):
+                # 다른 사용자 소유 디렉토리는 권한 변경 불가 (무시)
+                pass
+        finally:
+            # umask 복원
+            os.umask(old_umask)
 
         # 파일명 생성: His_{keyword}_{product_id}_{item_id}_{vendor_item_id}.png
         time_str = now.strftime("%H%M%S")

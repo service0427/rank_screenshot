@@ -37,19 +37,19 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **🇰🇷 다시 한 번 강조: 모든 분석, 설명, 응답은 한국어로 작성하세요! 🇰🇷**
 
-Coupang Agent V2는 Selenium + undetected-chromedriver를 사용한 자동화 탐지 우회 도구입니다. Chrome 130 (구버전 TLS) 및 144 (최신 버전)를 사용하여 TLS 핑거프린팅 다양성을 확보하고, VPN 통합으로 IP 우회 기능을 제공합니다.
+Coupang Agent V2는 Selenium + undetected-chromedriver를 사용한 자동화 탐지 우회 도구입니다. Chrome 130, 144 버전을 사용하여 핑거프린팅 다양성을 확보하고, VPN 통합으로 IP 우회 기능을 제공합니다.
 
 ---
 
-## 📁 프로젝트 폴더 구조 (2025-11-07 업데이트)
+## 📁 프로젝트 폴더 구조
 
-### 병렬 시스템 구조
+### 시스템 구조
 
-현재 프로젝트는 **UC (undetected-chromedriver)** 시스템을 운영하며, 향후 **nodriver** 전환을 위한 병렬 구조를 유지합니다.
+현재 프로젝트는 **UC (undetected-chromedriver)** 시스템만 운영합니다.
 
 ```
 rank_screenshot/
-├── common/                      # 🔄 공통 모듈 (UC + nodriver 공유)
+├── common/                      # 공통 모듈
 │   ├── vpn_api_client.py        # VPN 키 풀 클라이언트
 │   ├── vpn_connection_tracker.py
 │   ├── constants.py             # 전역 설정 (Config, ExecutionStatus 등)
@@ -58,7 +58,7 @@ rank_screenshot/
 │       ├── highlight_preset.py
 │       └── ... (6개 파일)
 │
-├── uc_lib/                      # 🔵 UC 시스템 (현재 운영 중)
+├── uc_lib/                      # UC 시스템
 │   ├── core/                    # - undetected-chromedriver 래퍼
 │   │   └── browser_core_uc.py
 │   ├── modules/                 # - UC 전용 모듈
@@ -68,32 +68,21 @@ rank_screenshot/
 │   └── workflows/               # - 검색 워크플로우
 │       └── search_workflow.py
 │
-├── no_lib/                      # 🟢 nodriver 시스템 (개발 예정)
-│   ├── core/                    # - 비동기 (async/await)
-│   ├── modules/                 # - CDP 직접 통신
-│   └── workflows/               # - 탐지율 개선 목표
+├── uc_agent.py                  # UC 메인 진입점
+├── uc_run_workers.py            # UC 멀티 워커
 │
-├── uc_agent.py                  # 🔵 UC 메인 진입점 (사용 중)
-├── uc_run_workers.py            # 🔵 UC 멀티 워커 (사용 중)
-│
-├── no_agent.py                  # 🟢 nodriver 진입점 (미작성)
-├── no_run_workers.py            # 🟢 nodriver 멀티 워커 (미작성)
-│
-├── uc_browser-profiles/         # 🔵 UC 프로필 디렉토리
+├── uc_browser-profiles/         # UC 프로필 디렉토리
 │   └── wg10N/                   # wg101-112 사용자별 프로필
 │       ├── 130/                 # Chrome 130 프로필
 │       └── 144/                 # Chrome 144 프로필
 │
-├── no_browser-profiles/         # 🟢 nodriver 프로필 (미사용)
-│
-└── chrome-version/              # 공유 리소스
+└── chrome-version/              # Chrome 바이너리
     ├── 130/
     └── 144/
 ```
 
 ### Import 경로 규칙
 
-**UC 시스템**:
 ```python
 # UC 전용 모듈
 from uc_lib.core.browser_core_uc import BrowserCoreUC
@@ -105,50 +94,15 @@ from common.vpn_api_client import VPNAPIClient
 from common.utils.human_behavior_selenium import HumanBehaviorSelenium
 ```
 
-**nodriver 시스템** (미래):
-```python
-# nodriver 전용 모듈
-from no_lib.core.browser_core_no import BrowserCoreNo
-from no_lib.modules.coupang_handler_no import CoupangHandlerNo
-
-# 공통 모듈 (동일)
-from common.constants import Config
-from common.vpn_api_client import VPNAPIClient
-```
-
-### 폴더 접두사 의미
-
-| 접두사 | 의미 | 상태 | 설명 |
-|--------|------|------|------|
-| **uc_** | **U**ndetected-**C**hromedriver | 🔵 운영 중 | Selenium 기반, 안정적 |
-| **no_** | **no**driver | 🟢 개발 예정 | 비동기, CDP 직접 통신 |
-| **common/** | 공통 모듈 | 🔄 공유 | 두 시스템 모두 사용 |
-
 ### 주요 파일 설명
 
-**현재 사용 중 (UC 시스템)**:
 - `uc_agent.py`: 단일 실행 진입점
 - `uc_run_workers.py`: 멀티 워커 오케스트레이션
 - `uc_lib/`: 모든 핵심 로직
 - `uc_browser-profiles/`: Chrome 프로필 저장소
-
-**미래 계획 (nodriver 시스템)**:
-- `no_agent.py`: 비동기 단일 실행
-- `no_run_workers.py`: multiprocessing 기반 멀티 워커
-- `no_lib/`: CDP 직접 통신 로직
-
-**공통**:
 - `common/`: VPN, constants, utils 공유
-- `chrome-version/`: Chrome 바이너리 공유
-- `screenshots/`, `logs/`: 출력 공유
-
-### 전환 계획
-
-1. **현재**: UC 시스템 안정화 및 개선
-2. **Phase 1**: nodriver 프로토타입 작성
-3. **Phase 2**: A/B 테스트 (탐지율 비교)
-4. **Phase 3**: nodriver 우세 시 완전 전환
-5. **정리**: uc_ 제거, no_ → 기본으로 변경
+- `chrome-version/`: Chrome 바이너리
+- `screenshots/`, `logs/`: 출력 디렉토리
 
 ---
 
@@ -564,25 +518,8 @@ core.clean_old_cache(max_age_hours=24)  # 24시간 이상 미사용 캐시 삭�
 #### Import 경로 설정
 
 ```python
-# common/constants.py
-class ImportPaths:
-    # 기본 모듈 경로
-    COMMON = "common"          # 공통 모듈
-    UC_LIB = "uc_lib"          # UC 전용 모듈
-    NODRIVER_LIB = "nodriver_lib"  # nodriver 전용 모듈
-
-    # 서브 경로
-    CORE = "core"
-    MODULES = "modules"
-    WORKFLOWS = "workflows"
-    UTILS = "utils"
-```
-
-#### 올바른 Import 예시
-
-```python
-# ✅ 공통 모듈 (모든 시스템에서 공유)
-from common.constants import Config, ExecutionStatus, ImportPaths
+# ✅ 공통 모듈
+from common.constants import Config, ExecutionStatus
 from common.vpn_api_client import VPNAPIClient
 from common.utils.human_behavior_selenium import natural_typing
 
@@ -591,19 +528,11 @@ from uc_lib.core.browser_core_uc import BrowserCoreUC
 from uc_lib.modules.coupang_handler_selenium import CoupangHandlerSelenium
 from uc_lib.modules.product_finder import ProductFinder
 from uc_lib.workflows.search_workflow import SearchWorkflow
-
-# ✅ nodriver 전용 모듈 (추후)
-from nodriver_lib.core.browser_core_nodriver import BrowserCoreNodriver
-from nodriver_lib.modules.coupang_handler_nodriver import CoupangHandlerNodriver
 ```
 
 #### 잘못된 Import (절대 사용 금지)
 
 ```python
-# ❌ lib는 이제 존재하지 않음
-from lib.constants import Config
-from lib.modules.vpn_api_client import VPNAPIClient
-
 # ❌ 상대 import로 공통 모듈 참조 (uc_lib에서 common을 참조할 때)
 from ..constants import Config  # 잘못됨!
 from ..utils.human_behavior_selenium import natural_typing  # 잘못됨!
@@ -613,34 +542,15 @@ from common.constants import Config
 from common.utils.human_behavior_selenium import natural_typing
 ```
 
-#### Import 경로 변경이 필요한 경우
-
-프로젝트 구조가 변경되어 import 경로를 바꿔야 한다면:
-
-1. **[common/constants.py](common/constants.py) 수정**:
-   ```python
-   class ImportPaths:
-       COMMON = "새로운_경로"  # 여기만 수정
-       # ...
-   ```
-
-2. **전체 프로젝트에서 일괄 변경**:
-   ```bash
-   find . -name "*.py" -exec sed -i 's/from common\./from 새로운_경로./g' {} \;
-   ```
-
-3. **문서 업데이트**: 이 섹션의 예시도 함께 수정
-
 ### 디렉토리 구조별 Import 규칙
 
-| 모듈 위치 | Common 참조 | UC_LIB 참조 | Nodriver 참조 |
-|-----------|-------------|-------------|---------------|
-| `common/` | 내부 import | ❌ 금지 | ❌ 금지 |
-| `uc_lib/` | `from common.` | 내부 import | ❌ 금지 |
-| `nodriver_lib/` | `from common.` | ❌ 금지 | 내부 import |
-| `tests/` | `from common.` | `from uc_lib.` | `from nodriver_lib.` |
+| 모듈 위치 | Common 참조 | UC_LIB 참조 |
+|-----------|-------------|-------------|
+| `common/` | 내부 import | ❌ 금지 |
+| `uc_lib/` | `from common.` | 내부 import |
+| `tests/` | `from common.` | `from uc_lib.` |
 
-**중요**: `common/`은 UC와 nodriver 양쪽에서 모두 사용하는 공통 모듈이므로, `uc_lib/`나 `nodriver_lib/`를 참조하면 안 됩니다.
+**중요**: `common/`은 공통 모듈이므로 `uc_lib/`를 참조하면 안 됩니다.
 
 ---
 
@@ -1239,3 +1149,4 @@ items_info.append({
 **활성화**: `Config.ENABLE_DEBUG_OVERLAY = True` (기본값)
 
 ---
+

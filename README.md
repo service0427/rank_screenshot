@@ -23,8 +23,8 @@ undetected-chromedriver + VPN 키 풀을 사용한 쿠팡 자동화 시스템
 **우분투 22.04 LTS에서 한 번에 모든 설정 완료:**
 
 ```bash
-git clone https://github.com/service0427/rank_screenshot_vpn.git
-cd rank_screenshot_vpn && ./setup.sh
+git clone https://github.com/service0427/rank_screenshot.git
+cd rank_screenshot && ./setup.sh
 ```
 
 **설치되는 항목:**
@@ -191,7 +191,7 @@ python3 uc_agent.py --version 134 --test-detection
 ## 📁 프로젝트 구조
 
 ```
-rank_screenshot_vpn/
+rank_screenshot/
 ├── uc_agent.py                   # 단일 실행 진입점
 ├── uc_run_workers.py             # 멀티 워커 오케스트레이션
 ├── setup.sh                      # 자동 설치 스크립트
@@ -345,8 +345,8 @@ Detection Test: False
 🧹 Cleaning cache older than 72 hours...
    ✓ No old cache to clean
 🚀 Launching Chrome 134 with undetected-chromedriver...
-   Path: /home/tech/rank_screenshot_vpn/chrome-version/134/chrome-linux64/chrome
-   Profile: /home/tech/rank_screenshot_vpn/uc_browser-profiles/chrome-134
+   Path: /home/tech/rank_screenshot/chrome-version/134/chrome-linux64/chrome
+   Profile: /home/tech/rank_screenshot/uc_browser-profiles/chrome-134
    ✓ Chrome launched (undetected-chromedriver)
    ✓ Anti-detection: ENABLED by default
 

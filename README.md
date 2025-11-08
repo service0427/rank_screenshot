@@ -558,9 +558,10 @@ ip route add default via 10.8.0.1 dev wg-10-8-0-14 table 101
 ```
 
 **네트워크 자동 복구**:
-- `network_watchdog.sh` - 60초마다 네트워크 상태 체크
+- `network_watchdog.sh` - 1분마다 네트워크 상태 체크
 - Crontab으로 자동 실행 (setup.sh에서 설정)
 - 3회 연속 실패 시 자동 복구 시작
+- 데몬 방식 대신 1회 실행 방식 (메모리 효율적)
 
 ### 문제 해결
 
@@ -576,19 +577,18 @@ crontab -l | grep watchdog
 (
   crontab -l 2>/dev/null || true
   echo ""
-  echo "# 네트워크 와치독 자동 재시작 (매 5분마다 실행 중인지 확인)"
-  echo "*/5 * * * * pgrep -f \"network_watchdog.sh\" > /dev/null || nohup /home/tech/rank_screenshot/network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &"
+  echo "# 네트워크 와치독 - 1분마다 네트워크 상태 체크"
+  echo "* * * * * /home/tech/rank_screenshot/network_watchdog.sh >> /tmp/network_watchdog.log 2>&1"
   echo ""
   echo "# 시스템 재부팅 시 자동 시작"
-  echo "@reboot sleep 30 && nohup /home/tech/rank_screenshot/network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &"
+  echo "@reboot sleep 30 && /home/tech/rank_screenshot/network_watchdog.sh >> /tmp/network_watchdog.log 2>&1"
 ) | crontab -
 
-# 3. 와치독 즉시 시작
-nohup /home/tech/rank_screenshot/network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &
+# 3. 와치독 즉시 실행
+/home/tech/rank_screenshot/network_watchdog.sh >> /tmp/network_watchdog.log 2>&1
 
 # 4. 확인
-sleep 2
-pgrep -f "network_watchdog.sh" && echo "✅ 와치독 실행 중" || echo "❌ 실행 실패"
+crontab -l | grep watchdog && echo "✅ Crontab 등록 완료" || echo "❌ 등록 실패"
 ```
 
 **주의**: 경로 `/home/tech/rank_screenshot/`는 실제 설치 경로에 맞게 수정하세요.

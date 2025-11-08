@@ -6,33 +6,36 @@
 # 사용법:
 #   ./network_watchdog.sh
 #
-# 백그라운드 실행:
-#   nohup ./network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &
-#
-# Crontab 설정:
-#   */5 * * * * pgrep -f "network_watchdog.sh" > /dev/null || nohup /home/tech/rank_screenshot/network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &
-#   @reboot sleep 30 && nohup /home/tech/rank_screenshot/network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &
+# Crontab 설정 (1분마다 체크):
+#   * * * * * /home/tech/rank_screenshot/network_watchdog.sh >> /tmp/network_watchdog.log 2>&1
+#   @reboot sleep 30 && /home/tech/rank_screenshot/network_watchdog.sh >> /tmp/network_watchdog.log 2>&1
 #
 
 # 설정
-CHECK_INTERVAL=60           # 체크 주기 (초)
 PING_TARGET="8.8.8.8"       # ping 테스트 대상
 PING_COUNT=3                # ping 시도 횟수
 FAIL_THRESHOLD=3            # 연속 실패 임계값
 MAIN_GATEWAY="121.172.70.254"  # 메인 게이트웨이
 MAIN_INTERFACE="enp4s0"     # 메인 인터페이스
-
-# 상태 변수
-consecutive_failures=0
-log_file="/tmp/network_watchdog.log"
-
-# setup.sh에서 sudoers 설정 완료 (비밀번호 불필요)
-# - /etc/sudoers.d/wireguard: wg-quick NOPASSWD
-# - /etc/sudoers.d/vpn-workers: vpn-worker-N 전환 NOPASSWD
+STATE_FILE="/tmp/network_watchdog_state.txt"  # 상태 파일
 
 # 로그 함수
 log() {
-    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1" | tee -a "$log_file"
+    echo "[$(date '+%Y-%m-%d %H:%M:%S')] $1"
+}
+
+# 상태 파일에서 연속 실패 횟수 읽기
+get_failure_count() {
+    if [ -f "$STATE_FILE" ]; then
+        cat "$STATE_FILE"
+    else
+        echo "0"
+    fi
+}
+
+# 상태 파일에 연속 실패 횟수 저장
+set_failure_count() {
+    echo "$1" > "$STATE_FILE"
 }
 
 # 네트워크 체크 함수
@@ -54,8 +57,8 @@ check_network() {
 restore_main_routing() {
     log "🚨 메인 라우팅 복구 시작..."
 
-    # 1. 모든 WireGuard 인터페이스 종료 (wg로 시작하는 모든 인터페이스)
-    for iface in $(ip link show | grep -oE 'wg[0-9]+|wg-[a-z0-9-]+'); do
+    # 1. 모든 WireGuard 인터페이스 종료
+    for iface in $(ip link show 2>/dev/null | grep -oE 'wg[0-9]+|wg-[a-z0-9-]+'); do
         log "   🔌 $iface 종료 중..."
         sudo ip link set "$iface" down 2>/dev/null || true
         sudo ip link delete "$iface" 2>/dev/null || true
@@ -76,7 +79,7 @@ restore_main_routing() {
     fi
 
     # 4. DNS 확인 및 복구
-    if ! grep -q "nameserver" /etc/resolv.conf; then
+    if ! grep -q "nameserver" /etc/resolv.conf 2>/dev/null; then
         log "   ⚠️  DNS 설정 없음 - 추가 중..."
         echo "nameserver 8.8.8.8" | sudo tee -a /etc/resolv.conf > /dev/null
         echo "nameserver 8.8.4.4" | sudo tee -a /etc/resolv.conf > /dev/null
@@ -84,9 +87,9 @@ restore_main_routing() {
 
     # 5. 인터페이스 재시작
     log "   🔄 메인 인터페이스 재시작..."
-    sudo ip link set "$MAIN_INTERFACE" down
+    sudo ip link set "$MAIN_INTERFACE" down 2>/dev/null
     sleep 1
-    sudo ip link set "$MAIN_INTERFACE" up
+    sudo ip link set "$MAIN_INTERFACE" up 2>/dev/null
     sleep 2
 
     # 6. DHCP 갱신
@@ -103,14 +106,14 @@ emergency_recovery() {
     log "🚨🚨🚨 긴급 복구 모드 시작 🚨🚨🚨"
 
     # 모든 WireGuard 인터페이스 강제 종료
-    for iface in $(ip link show | grep -oE 'wg[0-9]+|wg-[a-z0-9-]+'); do
+    for iface in $(ip link show 2>/dev/null | grep -oE 'wg[0-9]+|wg-[a-z0-9-]+'); do
         log "   💥 $iface 강제 종료"
         sudo ip link set "$iface" down 2>/dev/null || true
         sudo ip link delete "$iface" 2>/dev/null || true
     done
 
-    # 정책 라우팅 테이블 정리 (101-112)
-    for table_num in {101..112}; do
+    # 정책 라우팅 테이블 정리 (101-112, 200-249)
+    for table_num in {101..112} {200..249}; do
         if ip route show table $table_num 2>/dev/null | grep -q .; then
             log "   🗑️  테이블 $table_num 정리"
             sudo ip route flush table $table_num 2>/dev/null || true
@@ -123,53 +126,40 @@ emergency_recovery() {
     log "🚨 긴급 복구 완료"
 }
 
-# 메인 루프
-log "=========================================="
-log "🛡️  네트워크 와치독 시작 (wg101-112)"
-log "=========================================="
-log "설정:"
-log "  - 체크 주기: ${CHECK_INTERVAL}초"
-log "  - Ping 대상: $PING_TARGET"
-log "  - 실패 임계값: $FAIL_THRESHOLD회 연속"
-log "  - 메인 게이트웨이: $MAIN_GATEWAY"
-log "  - 정책 라우팅: Table 101-112"
-log "=========================================="
+# === 메인 로직 (1회 실행 후 종료) ===
 
-while true; do
-    if check_network; then
-        # 네트워크 정상
-        if [ $consecutive_failures -gt 0 ]; then
-            log "✅ 네트워크 복구 확인 (연속 실패: $consecutive_failures → 0)"
+consecutive_failures=$(get_failure_count)
+
+if check_network; then
+    # 네트워크 정상
+    if [ "$consecutive_failures" -gt 0 ]; then
+        log "✅ 네트워크 복구 확인 (연속 실패: $consecutive_failures → 0)"
+        set_failure_count 0
+    fi
+else
+    # 네트워크 실패
+    consecutive_failures=$((consecutive_failures + 1))
+    set_failure_count "$consecutive_failures"
+    log "⚠️  네트워크 체크 실패 ($consecutive_failures/$FAIL_THRESHOLD)"
+
+    if [ "$consecutive_failures" -ge "$FAIL_THRESHOLD" ]; then
+        log "🚨 연속 실패 임계값 도달 - 자동 복구 시작"
+
+        if [ "$consecutive_failures" -ge 5 ]; then
+            # 5회 이상 실패 시 긴급 복구
+            emergency_recovery
+        else
+            # 일반 복구
+            restore_main_routing
         fi
-        consecutive_failures=0
-    else
-        # 네트워크 실패
-        consecutive_failures=$((consecutive_failures + 1))
-        log "⚠️  네트워크 체크 실패 ($consecutive_failures/$FAIL_THRESHOLD)"
 
-        if [ $consecutive_failures -ge $FAIL_THRESHOLD ]; then
-            log "🚨 연속 실패 임계값 도달 - 자동 복구 시작"
-
-            if [ $consecutive_failures -ge 5 ]; then
-                # 5회 이상 실패 시 긴급 복구
-                emergency_recovery
-            else
-                # 일반 복구
-                restore_main_routing
-            fi
-
-            # 복구 후 10초 대기
-            sleep 10
-
-            # 복구 확인
-            if check_network; then
-                log "✅ 자동 복구 성공!"
-                consecutive_failures=0
-            else
-                log "❌ 자동 복구 실패 - 수동 확인 필요"
-            fi
+        # 복구 후 확인
+        sleep 5
+        if check_network; then
+            log "✅ 자동 복구 성공!"
+            set_failure_count 0
+        else
+            log "❌ 자동 복구 실패 - 다음 체크에서 재시도"
         fi
     fi
-
-    sleep "$CHECK_INTERVAL"
-done
+fi

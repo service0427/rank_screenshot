@@ -562,6 +562,37 @@ ip route add default via 10.8.0.1 dev wg-10-8-0-14 table 101
 - Crontab으로 자동 실행 (setup.sh에서 설정)
 - 3회 연속 실패 시 자동 복구 시작
 
+### 문제 해결
+
+**Crontab에 와치독이 등록되지 않은 경우**:
+
+setup.sh 실행 후 와치독이 자동 등록되어야 하지만, 실패한 경우 수동으로 등록할 수 있습니다:
+
+```bash
+# 1. Crontab 확인
+crontab -l | grep watchdog
+
+# 2. 등록되지 않았다면 수동 등록
+(
+  crontab -l 2>/dev/null || true
+  echo ""
+  echo "# 네트워크 와치독 자동 재시작 (매 5분마다 실행 중인지 확인)"
+  echo "*/5 * * * * pgrep -f \"network_watchdog.sh\" > /dev/null || nohup /home/tech/rank_screenshot/network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &"
+  echo ""
+  echo "# 시스템 재부팅 시 자동 시작"
+  echo "@reboot sleep 30 && nohup /home/tech/rank_screenshot/network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &"
+) | crontab -
+
+# 3. 와치독 즉시 시작
+nohup /home/tech/rank_screenshot/network_watchdog.sh > /tmp/network_watchdog.log 2>&1 &
+
+# 4. 확인
+sleep 2
+pgrep -f "network_watchdog.sh" && echo "✅ 와치독 실행 중" || echo "❌ 실행 실패"
+```
+
+**주의**: 경로 `/home/tech/rank_screenshot/`는 실제 설치 경로에 맞게 수정하세요.
+
 ---
 
 ## 📖 문서

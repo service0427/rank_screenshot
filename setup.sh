@@ -470,9 +470,9 @@ WORKERS_CREATED=0
 RULES_ADDED=0
 
 for i in {1..12}; do
-    uid=$((1100 + i))          # Worker-1 → UID 1101, Worker-2 → UID 1102, ...
-    username="wg$uid"          # wg101, wg102, ..., wg112
-    table_num=$((100 + i))     # Table 101, 102, ..., 112
+    uid=$((1100 + i))               # Worker-1 → UID 1101, Worker-2 → UID 1102, ...
+    username="wg$((100 + i))"       # wg101, wg102, ..., wg112
+    table_num=$((100 + i))          # Table 101, 102, ..., 112
 
     # 사용자 생성 (이미 존재하면 스킵)
     if ! id "$username" &>/dev/null; then

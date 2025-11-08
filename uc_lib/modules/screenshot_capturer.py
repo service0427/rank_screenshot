@@ -117,22 +117,22 @@ class ScreenshotCapturer:
         # umask를 임시로 0으로 설정하여 디렉토리를 777 권한으로 생성
         old_umask = os.umask(0)
         try:
-            # 디렉토리 생성 (mode=0o777로 명시)
-            year_month_day_dir.mkdir(parents=True, exist_ok=True, mode=0o777)
-
-            # exist_ok=True로 이미 존재하는 디렉토리의 경우 chmod로 권한 보정
-            # (다른 사용자가 생성한 디렉토리도 모두가 쓸 수 있도록)
-            try:
-                os.chmod(year_month_day_dir, 0o777)  # DD
-                os.chmod(year_month_day_dir.parent, 0o777)  # MM
-                os.chmod(year_month_day_dir.parent.parent, 0o777)  # YYYY
-                os.chmod(self.base_dir, 0o777)  # screenshots
-            except (PermissionError, OSError):
-                # 다른 사용자 소유 디렉토리는 권한 변경 불가 (무시)
-                pass
+            # os.makedirs()는 mode 파라미터를 제대로 적용함 (pathlib.mkdir()는 적용 안 됨)
+            os.makedirs(str(year_month_day_dir), mode=0o777, exist_ok=True)
         finally:
             # umask 복원
             os.umask(old_umask)
+
+        # 이미 존재하는 디렉토리의 경우 chmod로 권한 보정
+        # (다른 사용자가 생성한 디렉토리도 모두가 쓸 수 있도록)
+        try:
+            os.chmod(year_month_day_dir, 0o777)  # DD
+            os.chmod(year_month_day_dir.parent, 0o777)  # MM
+            os.chmod(year_month_day_dir.parent.parent, 0o777)  # YYYY
+            os.chmod(self.base_dir, 0o777)  # screenshots
+        except (PermissionError, OSError):
+            # 다른 사용자 소유 디렉토리는 권한 변경 불가 (무시)
+            pass
 
         # 파일명 생성: His_{keyword}_{product_id}_{item_id}_{vendor_item_id}.png
         time_str = now.strftime("%H%M%S")

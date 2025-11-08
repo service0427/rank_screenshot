@@ -8,7 +8,6 @@
 #
 # Crontab 설정 (1분마다 체크):
 #   * * * * * /home/tech/rank_screenshot/network_watchdog.sh >> /tmp/network_watchdog.log 2>&1
-#   @reboot sleep 30 && /home/tech/rank_screenshot/network_watchdog.sh >> /tmp/network_watchdog.log 2>&1
 #
 
 # 설정

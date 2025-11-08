@@ -582,14 +582,10 @@ if [ -f "$WATCHDOG_SCRIPT" ]; then
             echo ""
             echo "# 네트워크 와치독 - 1분마다 네트워크 상태 체크"
             echo "* * * * * $WATCHDOG_SCRIPT >> /tmp/network_watchdog.log 2>&1"
-            echo ""
-            echo "# 시스템 재부팅 시 자동 시작"
-            echo "@reboot sleep 30 && $WATCHDOG_SCRIPT >> /tmp/network_watchdog.log 2>&1"
         ) | crontab -
 
         log_success "  ✓ Crontab 설정 완료"
         log_info "    - 1분마다 네트워크 상태 체크"
-        log_info "    - 재부팅 시 자동 시작"
         log_info "    - 경로: $WATCHDOG_SCRIPT"
     fi
 

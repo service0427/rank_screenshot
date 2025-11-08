@@ -579,9 +579,6 @@ crontab -l | grep watchdog
   echo ""
   echo "# 네트워크 와치독 - 1분마다 네트워크 상태 체크"
   echo "* * * * * /home/tech/rank_screenshot/network_watchdog.sh >> /tmp/network_watchdog.log 2>&1"
-  echo ""
-  echo "# 시스템 재부팅 시 자동 시작"
-  echo "@reboot sleep 30 && /home/tech/rank_screenshot/network_watchdog.sh >> /tmp/network_watchdog.log 2>&1"
 ) | crontab -
 
 # 3. 와치독 즉시 실행

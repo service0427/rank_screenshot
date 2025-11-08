@@ -552,52 +552,8 @@ rm -f "$TMP_FILE2"
 echo ""
 
 # ===================================================================
-# 11/11 네트워크 와치독 자동 실행 설정
+# Crontab 설정은 수동으로 진행 (README.md 참고)
 # ===================================================================
-
-log_step "11/11 네트워크 와치독 자동 실행 설정 중..."
-echo ""
-
-WATCHDOG_SCRIPT="$SCRIPT_DIR/network_watchdog.sh"
-
-if [ -f "$WATCHDOG_SCRIPT" ]; then
-    log_info "네트워크 와치독 스크립트 확인: $WATCHDOG_SCRIPT"
-
-    # 실행 권한 부여
-    chmod +x "$WATCHDOG_SCRIPT"
-
-    # Crontab에 자동 실행 설정 추가
-    log_info "Crontab 설정 중..."
-
-    # 현재 crontab 백업
-    crontab -l > /tmp/crontab_backup_$$.txt 2>/dev/null || true
-
-    # 기존 와치독 설정 제거 후 새 설정 추가 (1분 단위 체크)
-    log_info "Crontab에서 와치독 설정 업데이트 중..."
-    (
-        # 기존 watchdog 관련 라인 제거
-        crontab -l 2>/dev/null | grep -v "network_watchdog.sh" || true
-        echo ""
-        echo "# 네트워크 와치독 - 1분마다 네트워크 상태 체크"
-        echo "* * * * * $WATCHDOG_SCRIPT >> /tmp/network_watchdog.log 2>&1"
-    ) | crontab -
-
-    log_success "  ✓ Crontab 설정 완료"
-    log_info "    - 1분마다 네트워크 상태 체크"
-    log_info "    - 경로: $WATCHDOG_SCRIPT"
-
-    # 와치독 즉시 실행 (1회)
-    log_info "네트워크 와치독 초기 실행 중..."
-    "$WATCHDOG_SCRIPT" >> /tmp/network_watchdog.log 2>&1
-    log_success "  ✓ 네트워크 와치독 초기 실행 완료"
-    log_info "    로그: /tmp/network_watchdog.log"
-    log_info "    Crontab이 1분마다 자동 실행합니다"
-else
-    log_warn "네트워크 와치독 스크립트 없음: $WATCHDOG_SCRIPT"
-    log_info "  수동으로 network_watchdog.sh를 실행하세요"
-fi
-
-echo ""
 
 # ===================================================================
 # 설치 완료
@@ -642,11 +598,13 @@ echo ""
 
 echo -e "${YELLOW}⚠️  참고사항:${NC}"
 echo "  • VPN 키 풀 방식 사용 (자동 키 할당/반납)"
-echo "  • 네트워크 와치독 자동 실행 (5분마다 체크, 재부팅 시 자동 시작)"
-echo "  • 네트워크 장애 시 자동 복구 (VPN 연결 정리 + 메인 라우팅 복구)"
 echo "  • ${CURRENT_USER} 사용자만으로 모든 작업 가능"
 echo "  • Chrome 버전 추가 설치: ./install-chrome-versions.sh [version]"
 echo ""
 
-log_info "모든 설치가 완료되었습니다. 바로 uc_run_workers.py를 실행할 수 있습니다!"
+echo -e "${YELLOW}⚠️  추가 설정 필요:${NC}"
+echo "  • Crontab 와치독 등록: README.md의 '네트워크 와치독 수동 설정' 참고"
+echo ""
+
+log_info "모든 설치가 완료되었습니다. Crontab 설정 후 uc_run_workers.py를 실행할 수 있습니다!"
 echo ""

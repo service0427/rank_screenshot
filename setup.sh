@@ -576,21 +576,21 @@ if [ -f "$WATCHDOG_SCRIPT" ]; then
     if crontab -l 2>/dev/null | grep -q "network_watchdog.sh"; then
         log_info "  ⊙ 와치독 Crontab 설정 이미 존재"
     else
-        # 새 crontab 설정 추가
+        # 새 crontab 설정 추가 (절대 경로 사용)
         (
             crontab -l 2>/dev/null || true
             echo ""
-            echo "# Network Watchdog - 네트워크 자동 복구 시스템"
-            echo "# 5분마다 와치독 프로세스 확인 및 재시작"
+            echo "# 네트워크 와치독 자동 재시작 (매 5분마다 실행 중인지 확인)"
             echo "*/5 * * * * pgrep -f \"network_watchdog.sh\" > /dev/null || nohup $WATCHDOG_SCRIPT > /tmp/network_watchdog.log 2>&1 &"
             echo ""
-            echo "# 시스템 재부팅 시 자동 시작 (30초 대기 후)"
+            echo "# 시스템 재부팅 시 자동 시작"
             echo "@reboot sleep 30 && nohup $WATCHDOG_SCRIPT > /tmp/network_watchdog.log 2>&1 &"
         ) | crontab -
 
         log_success "  ✓ Crontab 설정 완료"
         log_info "    - 5분마다 와치독 프로세스 확인"
         log_info "    - 재부팅 시 자동 시작"
+        log_info "    - 경로: $WATCHDOG_SCRIPT"
     fi
 
     # 와치독 즉시 시작

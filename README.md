@@ -1,49 +1,51 @@
-# Coupang Agent V2
+# UC Rank Screenshot
 
-Selenium + undetected-chromedriver를 사용한 쿠팡 자동화 탐지 테스트 도구
+undetected-chromedriver + VPN 키 풀을 사용한 쿠팡 자동화 시스템
 
 ## 🎯 주요 기능
 
-- ✅ **Chrome 127~144 버전 지원** (18개 Stable 버전)
-- ✅ **Chrome Beta/Dev/Canary 채널 지원** (3개 채널)
+- ✅ **Chrome 130, 144 버전 지원** (구버전 TLS + 최신 버전)
 - ✅ **undetected-chromedriver** - 자동화 탐지 우회
-- ✅ **TLS 핑거프린팅 우회** - 버전별 다양성 (총 21개 버전)
-- ✅ **빌드 번호 다양성** - Stable vs 채널 빌드 번호 차이
-- ✅ **VPN 통합** - IP 우회 (다중 VPN 서버 지원)
+- ✅ **TLS 핑거프린팅 우회** - 버전별 다양성
+- ✅ **VPN 키 풀** - 동적 VPN 할당/반납 (50개 용량)
+- ✅ **wg101-112 시스템** - UID 기반 정책 라우팅
+- ✅ **멀티 워커 지원** - 최대 12개 워커 동시 실행
+- ✅ **네트워크 자동 복구** - 와치독 시스템
 - ✅ **버전별 프로필 분리** - 쿠키/세션/로컬스토리지
-- ✅ **공유 캐시 시스템** - 디스크 공간 70% 절약
-- ✅ **72시간 미사용 캐시 자동 정리**
+- ✅ **캐시 보존 전략** - 트래픽 32% 절감
 - ✅ **한국어 브라우저 설정**
 - ✅ **1920x1080 고정 viewport**
-- ✅ **http2_protocol_error 탐지**
 
 ## 📦 설치
 
-### ⚡ 자동 설치 (권장)
+### ⚡ 자동 설치 (2줄)
 
-**우분투 22.04 LTS에서 한 번에 모든 의존성 설치:**
+**우분투 22.04 LTS에서 한 번에 모든 설정 완료:**
 
 ```bash
-# 저장소 클론
-git clone https://github.com/service0427/rank_screenshot.git
-cd rank_screenshot
-
-# 자동 설치 스크립트 실행
-./setup.sh
+git clone https://github.com/service0427/rank_screenshot_vpn.git
+cd rank_screenshot_vpn && ./setup.sh
 ```
 
 **설치되는 항목:**
 - ✅ Python 3.10+ 및 pip
+- ✅ WireGuard (VPN 키 풀용)
 - ✅ 필수 시스템 라이브러리 (Chrome 실행용)
-- ✅ Python 패키지 (undetected-chromedriver, selenium, Pillow, requests)
-- ✅ Chrome 130 (구버전 TLS 대표)
+- ✅ Python 패키지 (undetected-chromedriver, selenium, psutil)
+- ✅ Chrome 130 (구버전 TLS)
 - ✅ Chrome 144 (최신 버전)
-- ✅ 디렉토리 구조 생성
-- ✅ 권한 설정
+- ✅ 시스템 사용자 (wg101 ~ wg112)
+- ✅ 정책 라우팅 (Table 101-112)
+- ✅ sudoers 권한 설정
+- ✅ 네트워크 와치독 자동 실행
 
-**설치 후 바로 테스트:**
+**설치 후 바로 실행:**
 ```bash
-python3 agent.py --version 134 --close
+# 6개 워커로 멀티 실행
+python3 uc_run_workers.py -t 6
+
+# 단일 테스트
+python3 uc_agent.py --version 130 --keyword "노트북" --close
 ```
 
 ---
@@ -105,101 +107,79 @@ VPN과 함께 사용하는 경우 권한 설정이 필요합니다:
 
 ## 🚀 사용법
 
-### 간편 실행 (권장)
+### 멀티 워커 실행 (권장)
 
-**`--version` 없이 실행하면 자동으로 버전 선택 프롬프트 표시**:
+**VPN 키 풀을 사용한 동시 다중 작업**:
 
 ```bash
-# 가장 많이 사용하는 패턴
-python3 agent.py --close                    # 버전 선택 → 자동 종료
-python3 agent.py --vpn 0 --close            # VPN wg0 + 버전 선택 → 자동 종료
-python3 agent.py --keyword "게임"           # 버전 선택 → 게임 검색
+# 기본 실행 (6개 워커)
+python3 uc_run_workers.py -t 6
 
-# --version이 없으면 자동으로 버전 리스트 표시
-============================================================
-🔍 Chrome 버전 선택
-============================================================
-➤ 19. Chrome beta    ← 마지막 사용 버전
-  20. Chrome dev
-  21. Chrome canary
+# 최대 워커 (12개)
+python3 uc_run_workers.py -t 12
 
-선택 (1-21, Enter=마지막 사용: beta): [Enter]
-✓ 마지막 사용 버전 선택: Chrome beta
-============================================================
+# 특정 Chrome 버전 지정
+python3 uc_run_workers.py -t 6 --version 130
 ```
 
 **특징**:
-- ✅ **21개 Chrome 버전** 중 선택 (Stable 18 + 채널 3)
-- ✅ **마지막 사용 버전 기억** - Enter만 누르면 이전 버전 재사용
-- ✅ **➤ 표시**로 마지막 사용 버전 강조
-- ✅ **다른 옵션 유지** - `--vpn`, `--close`, `--keyword` 등은 그대로 적용
+- ✅ **VPN 키 풀 자동 할당** - 각 워커마다 독립적인 VPN 연결
+- ✅ **wg101-112 시스템** - UID 기반 정책 라우팅
+- ✅ **프로세스 격리** - 각 워커는 독립 사용자로 실행
+- ✅ **프로필 분리** - 워커별 독립 Chrome 프로필
+- ✅ **자동 복구** - 네트워크 와치독 시스템
 
-**사용 예시**:
-```
-============================================================
-🤖 Selenium + undetected-chromedriver Interactive Mode
-============================================================
+### 단일 실행 (테스트용)
 
-사용 가능한 Chrome 버전:
-   1. Chrome 127
-   2. Chrome 128
-   ...
-  18. Chrome 144
-➤ 19. Chrome beta    ← 마지막 사용 버전
-  20. Chrome dev
-  21. Chrome canary
+**개별 Chrome 버전 테스트**:
 
-선택 (1-21, Enter=마지막 사용: beta): [Enter 입력]
-✓ 마지막 사용 버전 선택: Chrome beta
+```bash
+# Chrome 130 테스트
+python3 uc_agent.py --version 130 --keyword "노트북" --close
 
-검색 키워드 (기본: 노트북): 게임
-탐지 테스트를 실행하시겠습니까? (y/N): n
+# Chrome 144 테스트
+python3 uc_agent.py --version 144 --keyword "게임" --close
+
+# 자동 종료 없이 실행
+python3 uc_agent.py --version 130 --keyword "노트북"
 ```
 
-### 명령행 옵션 (자동화용)
-
+**명령행 옵션**:
 ```bash
 # 특정 버전 지정
-python3 agent.py --version 134
-python3 agent.py --version beta
+python3 uc_agent.py --version 134
+python3 uc_agent.py --version beta
 
 # 키워드 지정
-python3 agent.py --version 134 --keyword "게임"
+python3 uc_agent.py --version 134 --keyword "게임"
 
 # 자동 종료 (3초 후)
-python3 agent.py --version 134 --close
+python3 uc_agent.py --version 134 --close
 
 # 탐지 테스트 실행
-python3 agent.py --version 134 --test-detection
-
-# VPN 사용
-python3 agent.py --vpn 0 --version 127
-python3 agent.py --vpn 1 --version beta
+python3 uc_agent.py --version 134 --test-detection
 ```
 
-### VPN 사용법
+### VPN 키 풀 시스템
 
-VPN을 사용하면 IP 우회를 통해 차단된 Chrome 버전(127-130)을 사용할 수 있습니다:
+**자동 VPN 할당 (멀티 워커)**:
+- `uc_run_workers.py`는 자동으로 VPN 키 풀에서 VPN을 할당합니다
+- 각 워커는 wg101-112 사용자로 실행됩니다
+- UID 1101-1112 기반 정책 라우팅이 자동으로 적용됩니다
 
-```bash
-# VPN 없이 실행 (로컬 IP)
-python3 agent.py --version 134
+**wg101-112 시스템**:
 
-# VPN 서버로 실행 (IP 우회)
-python3 agent.py --vpn 0 --version 127  # wg0/vpn0 사용
-python3 agent.py --vpn 1 --version 127  # wg1/vpn1 사용
-python3 agent.py --vpn 2 --version 128  # wg2/vpn2 사용
-python3 agent.py --vpn 3 --version beta # wg3/vpn3 사용
-```
+| Worker ID | 사용자명 | UID | 라우팅 테이블 | 프로필 경로 |
+|-----------|----------|-----|---------------|-------------|
+| 1 | wg101 | 1101 | 101 | uc_browser-profiles/wg101/{130,144} |
+| 2 | wg102 | 1102 | 102 | uc_browser-profiles/wg102/{130,144} |
+| ... | ... | ... | ... | ... |
+| 12 | wg112 | 1112 | 112 | uc_browser-profiles/wg112/{130,144} |
 
-**VPN 옵션**:
-- `--vpn` 옵션 없음: 로컬 IP / VPN 사용 안 함 (기본값)
-- `--vpn 0`: wg0/vpn0 사용 (첫 번째 VPN 서버)
-- `--vpn 1`: wg1/vpn1 사용 (두 번째 VPN 서버)
-- `--vpn N`: wgN/vpnN 사용 (N+1번째 VPN 서버)
-
-**VPN 설치**:
-VPN 클라이언트가 필요합니다: https://github.com/service0427/vpn
+**특징**:
+- ✅ **메인 이더넷 보존** - VPN 트래픽은 정책 라우팅으로 분리
+- ✅ **50개 VPN 용량** - 5개 서버 × 10개 동시 접속
+- ✅ **동적 할당/반납** - 워커 시작/종료 시 자동 관리
 
 ### 종료 방법
 
@@ -211,53 +191,63 @@ VPN 클라이언트가 필요합니다: https://github.com/service0427/vpn
 ## 📁 프로젝트 구조
 
 ```
-agent/
-├── agent.py                      # 메인 실행 파일
-├── multi_browser_manager.py      # 브라우저 버전 관리 라이브러리
-├── install-chrome-versions.sh    # Chrome 설치 스크립트 (Stable + 채널 통합)
-├── lib/
+rank_screenshot_vpn/
+├── uc_agent.py                   # 단일 실행 진입점
+├── uc_run_workers.py             # 멀티 워커 오케스트레이션
+├── setup.sh                      # 자동 설치 스크립트
+├── cleanup_all_wg.sh             # VPN 연결 정리 스크립트
+├── network_watchdog.sh           # 네트워크 자동 복구
+├── install-chrome-versions.sh    # Chrome 설치 스크립트
+│
+├── common/                       # 🔄 공통 모듈
+│   ├── constants.py              # 전역 설정 및 상태
+│   ├── vpn_api_client.py         # VPN 키 풀 클라이언트
+│   ├── vpn_connection_tracker.py
+│   └── utils/                    # 공통 유틸리티
+│       ├── human_behavior_selenium.py
+│       ├── highlight_preset.py
+│       └── ...
+│
+├── uc_lib/                       # 🔵 UC 시스템 (현재 운영)
 │   ├── core/
-│   │   └── browser_core_uc.py    # undetected-chromedriver 코어
+│   │   └── browser_core_uc.py    # undetected-chromedriver 래퍼
 │   ├── modules/
-│   │   └── coupang_handler_selenium.py  # 쿠팡 핸들러
-│   ├── utils/
-│   │   └── human_behavior_selenium.py   # 사람 행동 시뮬레이션
-│   └── constants.py              # 상수 정의
-├── chrome-version/               # Chrome 바이너리 (127~144)
-└── browser-profiles/             # 브라우저 프로필
-    ├── chrome-127/               # 버전별 프로필
-    ├── chrome-134/
-    └── shared-cache/             # 공유 캐시 (500MB 제한)
+│   │   ├── coupang_handler_selenium.py  # 쿠팡 핸들러
+│   │   ├── product_finder.py     # 상품 검색 및 매칭
+│   │   └── screenshot_*.py       # 스크린샷 관련
+│   └── workflows/
+│       └── search_workflow.py    # 검색 워크플로우
+│
+├── chrome-version/               # Chrome 바이너리
+│   ├── 130/                      # 구버전 TLS (127-130 대표)
+│   └── 144/                      # 최신 버전 (131+ 대표)
+│
+└── uc_browser-profiles/          # UC 프로필 디렉토리
+    └── wg10N/                    # wg101-112 사용자별 프로필
+        ├── 130/                  # Chrome 130 프로필
+        │   └── Default/          # 쿠키, 세션, 로컬스토리지
+        └── 144/                  # Chrome 144 프로필
+            └── Default/
 ```
 
-## 🔧 multi_browser_manager.py 역할
+## 🔧 Import 경로 규칙
 
-`multi_browser_manager.py`는 **브라우저 버전 관리 라이브러리**입니다:
-
-**주요 기능**:
-- ✅ **자동 버전 스캔**: `chrome-version/` 디렉토리에서 설치된 Chrome 버전 자동 감지
-- ✅ **랜덤 버전 선택**: 21개 버전(Stable 18 + 채널 3) 중 랜덤 선택
-- ✅ **그룹별 선택**: old(127-130), new(131-141), latest(142-144), channels(beta/dev/canary)
-- ✅ **다양한 브라우저 지원**: nodriver, Selenium, Playwright 예제 코드 포함
-
-**사용 예시**:
+**UC 시스템**:
 ```python
-from multi_browser_manager import BrowserVersionManager
+# UC 전용 모듈
+from uc_lib.core.browser_core_uc import BrowserCoreUC
+from uc_lib.modules.coupang_handler_selenium import CoupangHandlerSelenium
 
-# 버전 관리자 생성
-manager = BrowserVersionManager()
-
-# 랜덤 Chrome 선택 (Stable + 채널 포함)
-version, chrome_path = manager.get_random_chrome()
-
-# 그룹별 선택
-version, path = manager.get_chrome_group("old")      # 127-130 중 랜덤
-version, path = manager.get_chrome_group("channels")  # Beta/Dev/Canary 중 랜덤
-
-# 특정 버전 가져오기
-chrome_path = manager.get_chrome("134")
-chrome_path = manager.get_chrome("beta")
+# 공통 모듈
+from common.constants import Config, ExecutionStatus
+from common.vpn_api_client import VPNAPIClient
+from common.utils.human_behavior_selenium import HumanBehaviorSelenium
 ```
+
+**특징**:
+- ✅ **공통 모듈** (`common/`) - UC와 nodriver(예정) 공유
+- ✅ **UC 전용 모듈** (`uc_lib/`) - undetected-chromedriver 전용
+- ✅ **절대 import** - 모든 모듈은 절대 경로로 import
 
 ## 💡 주요 기능 설명
 
@@ -306,11 +296,45 @@ browser-profiles/
 
 ## 📊 실행 예시
 
+### 멀티 워커 실행 (6개 워커)
+
 ```bash
-$ python3 agent.py --version 134 --keyword "노트북" --close
+$ python3 uc_run_workers.py -t 6
 
 ============================================================
-🤖 Coupang Agent V2 - Selenium + undetected-chromedriver
+🚀 UC Multi-Worker System
+============================================================
+Target Workers: 6
+Chrome Version: Random selection
+VPN Key Pool: Enabled (wg101-112)
+============================================================
+
+[Worker-1] Starting as wg101 (UID 1101, Table 101)...
+[Worker-1] VPN allocated: 10.8.0.14 (Server #1)
+[Worker-1] Chrome 130 launching...
+
+[Worker-2] Starting as wg102 (UID 1102, Table 102)...
+[Worker-2] VPN allocated: 10.8.0.18 (Server #2)
+[Worker-2] Chrome 144 launching...
+
+...
+
+[Worker-6] Starting as wg106 (UID 1106, Table 106)...
+[Worker-6] VPN allocated: 10.8.0.26 (Server #1)
+[Worker-6] Chrome 130 launching...
+
+============================================================
+✅ All 6 workers started successfully
+============================================================
+```
+
+### 단일 실행 예시
+
+```bash
+$ python3 uc_agent.py --version 134 --keyword "노트북" --close
+
+============================================================
+🤖 UC Rank Screenshot - Selenium + undetected-chromedriver
 ============================================================
 Instance ID: 1
 Keyword: 노트북
@@ -321,8 +345,8 @@ Detection Test: False
 🧹 Cleaning cache older than 72 hours...
    ✓ No old cache to clean
 🚀 Launching Chrome 134 with undetected-chromedriver...
-   Path: /home/tech/agent/chrome-version/134/chrome-linux64/chrome
-   Profile: /home/tech/agent/browser-profiles/chrome-134
+   Path: /home/tech/rank_screenshot_vpn/chrome-version/134/chrome-linux64/chrome
+   Profile: /home/tech/rank_screenshot_vpn/uc_browser-profiles/chrome-134
    ✓ Chrome launched (undetected-chromedriver)
    ✓ Anti-detection: ENABLED by default
 
@@ -418,7 +442,7 @@ Main → Search → Match → Highlight → Watermark → Capture → Upload
 
 ---
 
-## 🔐 VPN 키 풀 시스템
+## 🔐 VPN 키 풀 시스템 (wg101-112)
 
 ### 개요
 
@@ -431,59 +455,88 @@ Main → Search → Match → Highlight → Watermark → Capture → Upload
 | VPN 서버 | 5개 |
 | 서버당 동시 접속 | 10개 |
 | 총 VPN 용량 | 50개 |
-| 시스템 사용자 | vpn-worker-1 ~ vpn-worker-12 |
-| 워커 최대 이론치 | 20개 |
-| **권장 워커 수** | **12-16개** |
+| **시스템 사용자** | **wg101 ~ wg112** |
+| **UID 범위** | **1101-1112** |
+| **라우팅 테이블** | **101-112** |
+| 워커 최대 동시 실행 | 12개 |
+
+### wg101-112 통합 네이밍 시스템
+
+**핵심 설계**: 모든 식별자가 하나의 숫자로 통일됨
+
+| Worker ID | 사용자명 | UID | 라우팅 테이블 | 인터페이스 | 프로필 경로 |
+|-----------|----------|-----|---------------|------------|-------------|
+| 1 | wg101 | 1101 | 101 | wg-10-8-0-14 | uc_browser-profiles/wg101/{130,144} |
+| 2 | wg102 | 1102 | 102 | wg-10-8-0-18 | uc_browser-profiles/wg102/{130,144} |
+| ... | ... | ... | ... | ... | ... |
+| 12 | wg112 | 1112 | 112 | wg-10-8-0-26 | uc_browser-profiles/wg112/{130,144} |
+
+**장점**:
+- ✅ **직관적** - 숫자만 보면 모든 정보 파악 가능
+- ✅ **충돌 없음** - UID 1101-1112는 시스템 서비스와 충돌하지 않음
+- ✅ **단순한 프로필 경로** - wg101 → uc_browser-profiles/wg101/
 
 ### 실행 방법
 
-#### run_workers.py로 멀티 워커 실행
+**멀티 워커 실행**:
 
 ```bash
-# 12개 워커로 작업 API 모드 실행 (VPN 키 풀 자동 할당)
-python3 run_workers.py --work-api --max-workers 12
+# 기본 실행 (6개 워커)
+python3 uc_run_workers.py -t 6
 
-# 16개 워커로 실행 (권장 최대)
-python3 run_workers.py --work-api --max-workers 16
+# 최대 실행 (12개 워커)
+python3 uc_run_workers.py -t 12
 
 # 특정 Chrome 버전 지정
-python3 run_workers.py --work-api --max-workers 12 --version 130
+python3 uc_run_workers.py -t 6 --version 130
 ```
 
 ### 주요 특징
 
 - ✅ **동적 VPN 할당**: 워커별로 VPN 키를 자동 할당/반납
-- ✅ **정책 라우팅**: UID 기반 라우팅으로 메인 이더넷 보존
-- ✅ **프로세스 격리**: 각 워커는 독립적인 시스템 사용자로 실행
+- ✅ **정책 라우팅**: UID 1101-1112 기반 라우팅으로 메인 이더넷 보존
+- ✅ **프로세스 격리**: 각 워커는 wg10N 사용자로 실행
 - ✅ **프로필 분리**: 워커별 독립적인 Chrome 프로필
 - ✅ **ChromeDriver 격리**: 사용자별 ChromeDriver 경로로 충돌 방지
+- ✅ **네트워크 자동 복구**: 와치독 시스템 (5분마다 체크)
 
 ### 아키텍처
 
 ```
-run_workers.py
+uc_run_workers.py
     ↓
-Worker Thread 1-N
+Worker Thread 1-12
     ↓
 VPNConnection (VPN 키 할당)
     ↓
-WireGuard (wg-vpn-pool-N)
+WireGuard (wg-10-8-0-N)
     ↓
-Policy Routing (UID → Table)
+Policy Routing (UID 1101-1112 → Table 101-112)
     ↓
-sudo -u vpn-worker-N python3 agent.py
+sudo -u wg10N python3 uc_agent.py
     ↓
-Chrome (독립 프로필)
+Chrome (uc_browser-profiles/wg10N/)
 ```
 
-### 테스트 검증 (2025-11-06)
+### 정책 라우팅 예시
 
-**50개 워커 테스트**:
-- VPN 키 할당: 50/50 (100%)
-- VPN 연결: 50/50 (100%)
-- 정책 라우팅: 50/50 (100%)
-- 브라우저 실행: 12/50 (시스템 사용자 제약)
-- 메인 이더넷: ✅ 보존 확인
+```bash
+# wg101 (UID 1101)의 트래픽은 라우팅 테이블 101 사용
+ip rule add uidrange 1101-1101 table 101
+
+# 라우팅 테이블 101은 wg-10-8-0-14 인터페이스를 통해 VPN으로
+ip route add default via 10.8.0.1 dev wg-10-8-0-14 table 101
+```
+
+### 테스트 검증 (2025-11-07)
+
+**12개 워커 테스트**:
+- ✅ VPN 키 할당: 12/12 (100%)
+- ✅ VPN 연결: 12/12 (100%)
+- ✅ 정책 라우팅: 12/12 (100%)
+- ✅ 브라우저 실행: 12/12 (100%)
+- ✅ 메인 이더넷: 보존 확인
+- ✅ ERR_NETWORK_CHANGED: 0건
 
 ### 권장 운영 방식
 
@@ -491,14 +544,23 @@ Chrome (독립 프로필)
 |------|---------|------|
 | 개발/테스트 | 1-2개 | 빠른 디버깅 |
 | 소규모 운영 | 4-8개 | 안정적, 모니터링 쉬움 |
-| **대규모 운영** | **12-16개** | **권장 최대** |
-| 이론적 최대 | 20개 | 하드웨어 여유 필요 |
+| **대규모 운영** | **12개** | **권장 최대** |
 
-**중요**: 50개는 시스템 사용자 부족 및 리소스 과부하로 불가
+### 필수 스크립트
 
-### 상세 문서
+**VPN 연결 정리**:
+```bash
+# VPN 연결만 정리
+./cleanup_all_wg.sh
 
-- **CLAUDE.md**: VPN 키 풀 상세 아키텍처 및 문제 해결 가이드
+# VPN 연결 + Chrome 프로세스 종료
+./cleanup_all_wg.sh --kill-chrome
+```
+
+**네트워크 자동 복구**:
+- `network_watchdog.sh` - 60초마다 네트워크 상태 체크
+- Crontab으로 자동 실행 (setup.sh에서 설정)
+- 3회 연속 실패 시 자동 복구 시작
 
 ---
 

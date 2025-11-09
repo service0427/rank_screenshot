@@ -11,13 +11,12 @@
 #   ./cleanup_all_wg.sh
 #
 
-# setup.sh에서 sudoers 설정 완료 (비밀번호 불필요)
-# - /etc/sudoers.d/wireguard: wg-quick NOPASSWD
-# - /etc/sudoers.d/wg-workers: wg10N 전환 NOPASSWD
-
-# sudo 세션 활성화 (한 번만 암호 입력)
-# 15분 동안 유효하며, 이후 스크립트 실행 시 암호 재입력 필요
-sudo -v
+# sudoers 설정 필요 (비밀번호 없이 실행)
+# /etc/sudoers.d/cleanup-wg 파일에 다음 내용 추가:
+#   tech ALL=(ALL) NOPASSWD: /usr/bin/wg-quick
+#   tech ALL=(ALL) NOPASSWD: /usr/bin/ip link delete wg*
+#   tech ALL=(ALL) NOPASSWD: /usr/bin/ip link del wg*
+#   tech ALL=(ALL) NOPASSWD: /usr/bin/ip link show wg*
 
 echo "============================================"
 echo "🧹 모든 WireGuard 연결 정리"

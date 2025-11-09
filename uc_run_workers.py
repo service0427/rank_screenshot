@@ -1176,11 +1176,6 @@ def main():
     elif args.adjust2:
         adjust_mode = "adjust2"
 
-    # sudo 세션 활성화 (VPN 인터페이스 정리를 위해 필요)
-    # 15분 동안 유효하며, cleanup_vpn_interface()에서 sudo 명령어 실행 시 암호 불필요
-    import subprocess
-    subprocess.run(['sudo', '-v'], check=False)
-
     # VPN 모드 결정 (VPN 키 풀 또는 Local)
     print("🔍 VPN 키 풀 API 확인 중...")
     try:

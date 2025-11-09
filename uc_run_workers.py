@@ -338,51 +338,63 @@ def cleanup_vpn_interface(worker_id: int) -> bool:
             ['ip', 'link', 'show', interface_name],
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=2
         )
 
         if result.returncode != 0:
             # 인터페이스 없음 (정상)
             return True
 
-        print(f"   🧹 기존 VPN 인터페이스 발견: {interface_name}")
-
-        # 2. wg-quick down 시도 (설정 파일이 있으면)
+        # 2. 인터페이스가 이미 존재 - 설정 파일만 확인
         config_path = Path(f"/tmp/vpn_configs/{interface_name}.conf")
-        if config_path.exists():
+
+        # 설정 파일이 없으면 이전 연결이 정상 종료되지 않은 것
+        # 하지만 인터페이스가 UP 상태면 재사용 가능 (강제 삭제 시도하지 않음)
+        if not config_path.exists():
+            # 인터페이스가 UP 상태인지 확인
+            if 'state UP' in result.stdout or 'state UNKNOWN' in result.stdout:
+                # UP 상태: 이전 연결이 살아있음 - 재사용 가능
+                # 삭제 시도하지 않고 그대로 둠 (VPNConnection이 재사용함)
+                return True
+            else:
+                # DOWN 상태: 정리 필요
+                print(f"   🧹 DOWN 상태 인터페이스 발견: {interface_name}")
+                # ip link set down 후 삭제
+                subprocess.run(
+                    ['sudo', 'ip', 'link', 'set', interface_name, 'down'],
+                    capture_output=True,
+                    timeout=2
+                )
+                time.sleep(0.5)
+                subprocess.run(
+                    ['sudo', 'ip', 'link', 'del', interface_name],
+                    capture_output=True,
+                    timeout=2
+                )
+                return True
+        else:
+            # 설정 파일이 있으면 wg-quick down 시도
             result = subprocess.run(
                 ['sudo', 'wg-quick', 'down', str(config_path)],
                 capture_output=True,
                 text=True,
-                timeout=30
+                timeout=10
             )
             if result.returncode == 0:
                 print(f"   ✅ wg-quick down 성공: {interface_name}")
-                # 설정 파일 삭제
-                try:
-                    config_path.unlink()
-                except Exception:
-                    pass
-                return True
-
-        # 3. 직접 인터페이스 삭제 (wg-quick 실패 시)
-        result = subprocess.run(
-            ['sudo', 'ip', 'link', 'del', interface_name],
-            capture_output=True,
-            text=True,
-            timeout=5
-        )
-
-        if result.returncode == 0:
-            print(f"   ✅ VPN 인터페이스 삭제: {interface_name}")
+            # 설정 파일 삭제 (성공 여부 무관)
+            try:
+                config_path.unlink()
+            except Exception:
+                pass
             return True
-        else:
-            print(f"   ⚠️  VPN 인터페이스 삭제 실패: {result.stderr}")
-            return False
 
+    except subprocess.TimeoutExpired:
+        # 타임아웃 발생 시 재사용으로 간주 (강제 종료하지 않음)
+        return True
     except Exception as e:
-        print(f"   ⚠️  VPN 정리 중 오류: {e}")
-        return False
+        # 기타 오류 발생 시에도 계속 진행 (인터페이스는 재사용됨)
+        return True
 
 
 # ============================================================

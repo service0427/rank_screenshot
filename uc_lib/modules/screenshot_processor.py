@@ -10,6 +10,10 @@ from .screenshot_capturer import ScreenshotCapturer
 from .screenshot_uploader import ScreenshotUploader
 from .image_overlay import ImageOverlay
 
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from common.constants import Config
+
 
 class ScreenshotProcessor:
     """스크린샷 캡처, 오버레이, 업로드를 통합 처리하는 클래스"""
@@ -103,9 +107,17 @@ class ScreenshotProcessor:
             else:
                 print(f"⚠️  오버레이 추가 실패")
 
-        # 3. 업로드 (활성화된 경우)
+        # 3. 업로드 (활성화된 경우 + 테스트 모드 아닐 때만)
         uploaded_url = None
-        if self.enable_upload and self.uploader:
+
+        # type=adjust 모드 체크
+        if Config.is_adjust_mode():
+            print("\n" + "=" * 60)
+            print("🧪 테스트 모드 (type=adjust)")
+            print("=" * 60)
+            print(f"   ℹ️  이미지 서버 업로드 건너뜀")
+            print(f"   📁 로컬에만 저장: {screenshot_path}\n")
+        elif self.enable_upload and self.uploader:
             print("\n" + "=" * 60)
             print("📤 스크린샷 업로드")
             print("=" * 60 + "\n")

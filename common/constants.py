@@ -222,6 +222,18 @@ class Config:
     WORK_ALLOCATE_URL = "http://61.84.75.37:3302/api/work/allocate-screenshot?type=adjust&site_code=topr"
     WORK_RESULT_URL = "http://61.84.75.37:3302/api/work/screenshot-result"
 
+    # Upload Settings (테스트 모드)
+    # type=adjust가 있으면 개발/테스트 모드로 간주하여 이미지 서버 업로드 비활성화
+    @staticmethod
+    def is_adjust_mode():
+        """
+        type=adjust 파라미터 확인하여 테스트 모드 여부 반환
+
+        Returns:
+            True: 테스트 모드 (로컬 저장만), False: 프로덕션 모드 (업로드 포함)
+        """
+        return 'type=adjust' in Config.WORK_ALLOCATE_URL
+
     # Browser Profiles (사용자별 독립 디렉토리)
     # VPN 사용 시 각 사용자(vpn0, vpn1...)가 자신의 홈 디렉토리에 프로필 저장
     # 이를 통해 권한 충돌 및 리소스 공유 문제 방지

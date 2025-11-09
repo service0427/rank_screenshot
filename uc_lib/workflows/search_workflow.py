@@ -514,9 +514,6 @@ class SearchWorkflow:
             print("🔍 Fingerprint 검증 시작")
             print("=" * 60)
 
-            # 현재 URL 저장 (나중에 복귀용)
-            original_url = self.driver.current_url
-
             # Fingerprint playground 접속
             fingerprint_url = "https://demo.fingerprint.com/playground"
             print(f"   🌐 접속 중: {fingerprint_url}")

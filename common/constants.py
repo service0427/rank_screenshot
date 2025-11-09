@@ -218,7 +218,8 @@ class Config:
     HUB_SERVER_URL = "http://mkt.techb.kr:3001"
 
     # Work API (작업 할당 및 결과 제출)
-    WORK_ALLOCATE_URL = "http://61.84.75.37:3302/api/work/allocate-screenshot?site_code=topr"
+    # WORK_ALLOCATE_URL = "http://61.84.75.37:3302/api/work/allocate-screenshot?site_code=topr"
+    WORK_ALLOCATE_URL = "http://61.84.75.37:3302/api/work/allocate-screenshot?type=adjust&site_code=topr"
     WORK_RESULT_URL = "http://61.84.75.37:3302/api/work/screenshot-result"
 
     # Browser Profiles (사용자별 독립 디렉토리)
@@ -255,6 +256,9 @@ class Config:
     # Debug Settings
     DEBUG_MODE = False  # 디버그 모드 (--debug 플래그로 설정됨, 상세 로그 및 파일 저장)
     ENABLE_DEBUG_OVERLAY = True  # 디버깅 오버레이 표시 여부 ([전체:N/일반:M] 형식)
+
+    # Fingerprint Verification
+    ENABLE_FINGERPRINT_CHECK = True  # Fingerprint.com playground 접속 및 visitorId 추출 여부
 
     # Network Monitoring (ERR_NETWORK_CHANGED 감지용)
     ENABLE_NETWORK_ERROR_MONITOR = True  # CDP 네트워크 에러 모니터링 활성화

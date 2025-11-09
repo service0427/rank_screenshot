@@ -143,7 +143,8 @@ class SearchWorkflow:
 
         try:
             # 0. Fingerprint 검증 (선택적)
-            self._check_fingerprint_visitor_id()
+            if Config.ENABLE_FINGERPRINT_CHECK:
+                self._check_fingerprint_visitor_id()
 
             # 1. 쿠팡 홈페이지 이동
             print("\n" + "=" * 60)

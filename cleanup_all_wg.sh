@@ -116,10 +116,19 @@ if [ -z "$remaining_interfaces" ]; then
 else
     echo "$remaining_interfaces" | while read iface; do
         echo "   💥 $iface 강제 종료"
-        sudo ip link set "$iface" down 2>/dev/null
-        sudo ip link delete "$iface" 2>/dev/null
-        if [ $? -eq 0 ]; then
+
+        # DOWN으로 설정 (타임아웃 2초)
+        timeout 2 sudo ip link set "$iface" down 2>/dev/null
+
+        # 삭제 시도 (타임아웃 2초)
+        timeout 2 sudo ip link delete "$iface" 2>/dev/null
+        result=$?
+
+        if [ $result -eq 0 ]; then
             echo "      ✅ 성공"
+        elif [ $result -eq 124 ]; then
+            # 타임아웃 (124는 timeout 명령어의 반환 코드)
+            echo "      ⏰ 타임아웃 (활성 연결 - 건너뜀)"
         else
             echo "      ⚠️  실패 (이미 삭제됨?)"
         fi

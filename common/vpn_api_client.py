@@ -231,6 +231,31 @@ class VPNConnection:
             성공 여부
         """
         try:
+            # 인터페이스 이름 미리 설정
+            user_id = 100 + self.worker_id
+            self.interface_name = f"wg{user_id}"
+
+            # 0. 이미 연결되어 있는지 확인
+            check_cmd = f"ip link show {self.interface_name}"
+            result = subprocess.run(check_cmd, shell=True, capture_output=True, text=True)
+
+            if result.returncode == 0:
+                # 인터페이스가 이미 존재함
+                print(f"   ℹ️  {self.interface_name} 인터페이스가 이미 존재합니다 (재사용)")
+
+                # 내부 IP 조회 (기존 인터페이스에서)
+                ip_cmd = f"ip addr show {self.interface_name}"
+                ip_result = subprocess.run(ip_cmd, shell=True, capture_output=True, text=True)
+
+                # inet 10.8.0.14/32 형식에서 IP 추출
+                import re
+                match = re.search(r'inet\s+(\d+\.\d+\.\d+\.\d+)', ip_result.stdout)
+                if match:
+                    self.internal_ip = match.group(1)
+                    print(f"   📍 내부 IP: {self.internal_ip}")
+
+                return True
+
             # 1. VPN 키 할당
             self.vpn_key_data = self.vpn_client.allocate_key(server_ip)
             if not self.vpn_key_data:
@@ -244,8 +269,7 @@ class VPNConnection:
             # 예: worker_id 1 → wg101
             #     worker_id 5 → wg105
             #     worker_id 12 → wg112
-            user_id = 100 + self.worker_id  # Worker-1 → 101, Worker-2 → 102, etc.
-            self.interface_name = f"wg{user_id}"
+            # (이미 위에서 설정됨)
 
             # 3. WireGuard 설정 파일 생성 (정책 라우팅 적용)
             config_content = self.vpn_key_data['config']
@@ -390,39 +414,9 @@ class VPNConnection:
                 public_key=self.vpn_key_data.get('public_key')
             )
 
-            # 네트워크 안정화 대기 (ERR_NETWORK_CHANGED 방지)
-            # 2025-11-07: RESULT.md 해결책 적용
-            # wg up → ping 2~3회 → 0.5초 정적 구간 → Chrome 실행
+            # 네트워크 안정화 대기 (간소화)
             import time
-            test_ip = "8.8.8.8"  # Google DNS
-            max_attempts = 3
-
-            for attempt in range(1, max_attempts + 1):
-                # ping으로 외부 인터넷 연결 확인
-                ping_result = subprocess.run(
-                    ['ping', '-c', '1', '-W', '2', test_ip],
-                    capture_output=True,
-                    text=True,
-                    timeout=3
-                )
-
-                if ping_result.returncode == 0:
-                    if attempt < max_attempts:
-                        # 성공해도 2~3회 ping 반복 (안정성 확인)
-                        time.sleep(0.3)
-                    continue
-                else:
-                    if attempt < max_attempts:
-                        print(f"   ⏳ 네트워크 안정화 대기 중... ({attempt}/{max_attempts})")
-                        time.sleep(1)
-                    else:
-                        print(f"   ⚠️  인터넷 연결 확인 실패 (계속 진행)")
-                        break
-
-            # 모든 ping 성공 후 정적 구간 대기
-            # 라우팅 규칙 전파 완료 + netlink 이벤트 안정화
-            print(f"   ✓ 네트워크 안정화 완료 (ping {max_attempts}회 성공)")
-            time.sleep(0.5)  # 추가 안정화 대기
+            time.sleep(0.5)  # 최소 대기
 
             return True
 

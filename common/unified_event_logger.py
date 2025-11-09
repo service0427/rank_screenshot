@@ -152,9 +152,7 @@ def log_event(
         if not file_exists:
             os.chmod(log_file, 0o666)
     except Exception as e:
-        # 로깅 실패 오류를 stderr로 출력 (디버깅용)
-        import sys
-        print(f"⚠️ log_event() 실패: {log_file} - {type(e).__name__}: {e}", file=sys.stderr)
+        # 로깅 실패 무시 (권한 오류 등은 정상)
         pass
 
 

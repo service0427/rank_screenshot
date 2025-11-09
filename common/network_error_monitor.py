@@ -138,13 +138,16 @@ class NetworkErrorMonitor:
                                     }
                                 )
 
-                        # 기타 네트워크 에러
+                        # 기타 네트워크 에러 (차단 관련만 출력)
                         elif error_text and 'ERR_' in error_text:
                             self.error_count += 1
-                            self.log(
-                                f"⚠️  네트워크 에러: {error_text} (RequestID: {request_id})",
-                                "WARNING"
-                            )
+                            # HTTP2_PROTOCOL_ERROR만 출력 (쿠팡 차단 신호)
+                            if 'HTTP2_PROTOCOL_ERROR' in error_text or 'H1192' in error_text:
+                                self.log(
+                                    f"⚠️  차단 감지: {error_text} (RequestID: {request_id})",
+                                    "WARNING"
+                                )
+                            # 나머지는 카운트만 (콘솔 출력 안 함)
 
                     # Page.frameNavigated 이벤트 감지 (페이지 로드)
                     elif method == 'Page.frameNavigated':

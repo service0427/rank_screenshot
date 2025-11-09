@@ -142,6 +142,9 @@ class SearchWorkflow:
         self.screenshot_id = screenshot_id  # 메타데이터 생성 시 사용
 
         try:
+            # 0. Fingerprint 검증 (선택적)
+            self._check_fingerprint_visitor_id()
+
             # 1. 쿠팡 홈페이지 이동
             print("\n" + "=" * 60)
             print("🏠 쿠팡 홈페이지 이동")
@@ -498,6 +501,89 @@ class SearchWorkflow:
             # 실패해도 3초는 대기
             time.sleep(3)
             return False
+
+    def _check_fingerprint_visitor_id(self) -> Optional[str]:
+        """
+        Fingerprint.com playground 접속 및 visitorId 추출
+
+        Returns:
+            visitorId 문자열 또는 None (실패 시)
+        """
+        try:
+            print("\n" + "=" * 60)
+            print("🔍 Fingerprint 검증 시작")
+            print("=" * 60)
+
+            # 현재 URL 저장 (나중에 복귀용)
+            original_url = self.driver.current_url
+
+            # Fingerprint playground 접속
+            fingerprint_url = "https://demo.fingerprint.com/playground"
+            print(f"   🌐 접속 중: {fingerprint_url}")
+
+            self.driver.get(fingerprint_url)
+
+            # 페이지 로딩 대기 (최대 20초)
+            try:
+                WebDriverWait(self.driver, 20).until(
+                    lambda d: d.execute_script("return document.readyState") == "complete"
+                )
+            except Exception as e:
+                print(f"   ⚠️  페이지 로딩 타임아웃 (20초) - 무시하고 계속")
+                return None
+
+            # 추가 대기 (JavaScript 실행 완료)
+            time.sleep(3)
+
+            # 첫 번째 h2 요소 찾기
+            h2_elements = self.driver.find_elements(By.TAG_NAME, "h2")
+
+            if not h2_elements:
+                print(f"   ⚠️  h2 요소를 찾을 수 없음 - 무시하고 계속")
+                return None
+
+            # 첫 번째 h2의 텍스트 추출
+            visitor_id = h2_elements[0].text.strip()
+
+            if visitor_id:
+                print(f"   ✅ visitorId 추출 성공: {visitor_id}")
+
+                # 파일에 누적 저장
+                from datetime import datetime
+                from pathlib import Path
+
+                log_dir = Path(__file__).parent.parent.parent / "logs"
+                log_dir.mkdir(exist_ok=True, mode=0o777)
+
+                log_file = log_dir / "fingerprint_visitor_ids.log"
+
+                timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                log_entry = f"[{timestamp}] {visitor_id}\n"
+
+                with open(log_file, "a", encoding="utf-8") as f:
+                    f.write(log_entry)
+
+                # 파일 권한 설정 (모든 사용자 쓰기 가능)
+                try:
+                    import os
+                    os.chmod(log_file, 0o666)
+                except:
+                    pass
+
+                print(f"   📝 저장 완료: {log_file}")
+
+                return visitor_id
+            else:
+                print(f"   ⚠️  visitorId가 비어있음 - 무시하고 계속")
+                return None
+
+        except Exception as e:
+            print(f"   ⚠️  Fingerprint 검증 실패: {e}")
+            return None
+
+        finally:
+            # 원래 URL로 복귀하지 않음 (다음 단계에서 쿠팡 검색 진행)
+            pass
 
     def _display_watermark_and_capture(
         self,

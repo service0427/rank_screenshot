@@ -808,8 +808,18 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                 if available_versions:
                     selected_version = random.choice(available_versions)
                 else:
-                    # 모든 버전이 차단됨 (이론적으로 발생하지 않아야 함)
-                    selected_version = "random"
+                    # 모든 Chrome 버전이 차단됨 - 1분 후 재시도
+                    vpn_display = "Local" if selected_vpn == 'L' else ("VPN 키 풀" if selected_vpn == 'VPN' else f"VPN {selected_vpn}")
+                    min_remaining = min([r for _, r in blocked_versions]) if blocked_versions else 60
+                    print(f"\n   ⚠️  {vpn_display}: 사용 가능한 Chrome 버전이 없습니다")
+                    print(f"   ⏰ 최소 대기 시간: {min_remaining // 60}분 {min_remaining % 60}초")
+                    for ver, remaining in sorted(blocked_versions, key=lambda x: x[1]):
+                        print(f"      - Chrome {ver}: {remaining // 60}분 {remaining % 60}초 남음")
+                    print(f"   🔄 1분 후 재시도...")
+                    time.sleep(60)
+                    if not is_infinite:
+                        i -= 1  # 작업 카운트 감소 (재시도)
+                    continue  # 다시 루프 처음으로
 
             # 작업 시작 메시지
             if selected_vpn == 'L':

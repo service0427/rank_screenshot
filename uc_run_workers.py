@@ -950,7 +950,7 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                     print(f"   ⚠️  차단 목록 추가: {selected_vpn or 'Local'} + Chrome {selected_version} (10분)")
 
                 # 다음 반복으로 진행 (작업 실패 처리)
-                stats.add_failure()
+                stats.add_result(False)  # Timeout도 실패로 기록
                 if screenshot_id:
                     log_result(worker_id, screenshot_id, selected_vpn, chrome_version, False, elapsed, api_client)
                 continue

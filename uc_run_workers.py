@@ -851,12 +851,13 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
             display = os.environ.get('DISPLAY', ':0')
 
             if use_vpn and vpn_conn:
-                # WireGuard 키 풀: sudo -u wgN env ... python3 uc_agent.py ...
+                # WireGuard 키 풀: sudo -u wgN env ... python3 /absolute/path/uc_agent.py ...
                 # Worker-1 → wg101, Worker-2 → wg102, ... (UID/Table과 숫자 통일)
                 user_id = 100 + worker_id
                 wg_user = f"wg{user_id}"
                 wg_home = f"/home/{wg_user}"
                 vpn_interface = vpn_conn.interface_name if vpn_conn.interface_name else f"wg{user_id}"
+                agent_path = str(SCRIPT_DIR / "uc_agent.py")  # 절대 경로 사용 (Permission denied 방지)
                 cmd = [
                     "sudo", "-u", wg_user,
                     "env",
@@ -865,7 +866,7 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                     f"XDG_CACHE_HOME={current_user_home}/.cache",
                     f"XDG_DATA_HOME={current_user_home}/.local/share",
                     f"VPN_INTERFACE={vpn_interface}",  # VPN 인터페이스 정보 전달
-                    "python3", "uc_agent.py",
+                    "python3", agent_path,  # 절대 경로 사용
                     "--work-api",
                     "--screenshot-id", str(screenshot_id),
                     "--keyword", keyword,
@@ -873,9 +874,10 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
                     "--vpn-pool-worker", str(worker_id),
                 ]
             else:
-                # Local: python3 uc_agent.py ...
+                # Local: python3 /absolute/path/uc_agent.py ...
+                agent_path = str(SCRIPT_DIR / "uc_agent.py")  # 절대 경로 사용 (일관성 유지)
                 cmd = [
-                    "python3", "uc_agent.py",
+                    "python3", agent_path,  # 절대 경로 사용
                     "--work-api",
                     "--screenshot-id", str(screenshot_id),
                     "--keyword", keyword,

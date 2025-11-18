@@ -59,9 +59,25 @@ class CoupangHandlerSelenium:
         self.action_status = ActionStatus.NAVIGATING
 
         try:
+            # 현재 URL 확인 (이미 쿠팡 홈이면 재로드 스킵)
+            current_url = self.driver.current_url.rstrip('/')
+            target_url = self.BASE_URL.rstrip('/')
+
+            if current_url == target_url:
+                print(f"   ℹ️  이미 쿠팡 홈 페이지입니다 (재로드 스킵)")
+                print(f"   현재 URL: {current_url}")
+                self.action_status = ActionStatus.LOADED
+
+                # 네트워크 모드 오버레이 표시
+                self.show_network_mode_overlay()
+
+                print("   ✓ Home page ready")
+                return True
+
             # 페이지 로드 타임아웃 설정 (20초)
             self.driver.set_page_load_timeout(20)
 
+            print(f"   🔄 페이지 로드 중: {self.BASE_URL}")
             self.driver.get(self.BASE_URL)
             self.action_status = ActionStatus.LOADED
 

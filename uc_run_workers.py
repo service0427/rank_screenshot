@@ -900,7 +900,8 @@ def run_worker(worker_id: int, iterations: int, stats: WorkerStats, adjust_mode:
             # 나머지 옵션 추가
             cmd.extend([
                 "--close",
-                "--instance", str(worker_id)  # 워커 ID를 instance_id로 사용
+                "--instance", str(worker_id),  # 워커 ID를 instance_id로 사용
+                "--ip-check"  # VPN 연결 확인을 위해 자동으로 IP 체크
             ])
 
             # 핑거프린트 스푸핑 옵션 추가
@@ -1080,6 +1081,9 @@ def main():
   # 6개 스레드로 각각 100회 실행
   python3 run_workers.py -t 6 -i 100
 
+  # 로컬 모드 (VPN 사용 안 함)
+  python3 run_workers.py -t 1 -i 1 --local
+
   # 창 크기 지정 (기본: 1300x1200)
   python3 run_workers.py -t 6 -W 1000 -H 900
 
@@ -1159,6 +1163,12 @@ def main():
         help="스푸핑 프리셋 (minimal=GPU+Canvas+Audio, light=+Hardware, medium=+Screen, full=+Touch 권장)"
     )
 
+    parser.add_argument(
+        "--local",
+        action="store_true",
+        default=False,
+        help="로컬 모드 (VPN 사용 안 함)"
+    )
 
     args = parser.parse_args()
 
@@ -1189,22 +1199,28 @@ def main():
         adjust_mode = "adjust2"
 
     # VPN 모드 결정 (VPN 키 풀 또는 Local)
-    print("🔍 VPN 키 풀 API 확인 중...")
-    try:
-        vpn_client = VPNAPIClient()
-        servers = vpn_client.get_server_list()
-        if servers and len(servers) > 0:
-            # VPN 키 풀 사용 (True로 설정하면 워커가 동적 할당 사용)
-            vpn_list = True
-            print(f"   ✓ VPN 키 풀 사용 가능 (서버 {len(servers)}개)")
-            print(f"   ✓ VPN 키 동적 할당 모드 활성화")
-        else:
-            print(f"   ⚠️  VPN 서버 없음 - Local 모드 사용")
-            vpn_list = ['L']
-    except Exception as e:
-        print(f"   ⚠️  VPN API 조회 실패: {e}")
-        print(f"   ⚠️  Local 모드만 사용합니다")
+    if args.local:
+        # --local 옵션: 강제 로컬 모드
+        print("🏠 로컬 모드 (VPN 사용 안 함)")
         vpn_list = ['L']
+    else:
+        # VPN 키 풀 API 확인
+        print("🔍 VPN 키 풀 API 확인 중...")
+        try:
+            vpn_client = VPNAPIClient()
+            servers = vpn_client.get_server_list()
+            if servers and len(servers) > 0:
+                # VPN 키 풀 사용 (True로 설정하면 워커가 동적 할당 사용)
+                vpn_list = True
+                print(f"   ✓ VPN 키 풀 사용 가능 (서버 {len(servers)}개)")
+                print(f"   ✓ VPN 키 동적 할당 모드 활성화")
+            else:
+                print(f"   ⚠️  VPN 서버 없음 - Local 모드 사용")
+                vpn_list = ['L']
+        except Exception as e:
+            print(f"   ⚠️  VPN API 조회 실패: {e}")
+            print(f"   ⚠️  Local 모드만 사용합니다")
+            vpn_list = ['L']
 
     # VPN 동시 할당 관리자 생성
     vpn_allocation_manager = VPNAllocationManager()

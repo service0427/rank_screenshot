@@ -8,6 +8,7 @@ import requests
 import subprocess
 import tempfile
 import os
+import time
 from typing import Dict, Optional
 from pathlib import Path
 
@@ -235,26 +236,74 @@ class VPNConnection:
             user_id = 100 + self.worker_id
             self.interface_name = f"wg{user_id}"
 
-            # 0. 이미 연결되어 있는지 확인
+            # 0. 기존 연결이 있으면 강제로 정리하고 새로 연결
             check_cmd = f"ip link show {self.interface_name}"
             result = subprocess.run(check_cmd, shell=True, capture_output=True, text=True)
 
             if result.returncode == 0:
-                # 인터페이스가 이미 존재함
-                print(f"   ℹ️  {self.interface_name} 인터페이스가 이미 존재합니다 (재사용)")
+                # 인터페이스가 이미 존재함 - 강제 종료 후 재연결
+                print(f"   🔄 {self.interface_name} 인터페이스가 이미 존재합니다 (강제 종료 후 재연결)")
 
-                # 내부 IP 조회 (기존 인터페이스에서)
-                ip_cmd = f"ip addr show {self.interface_name}"
-                ip_result = subprocess.run(ip_cmd, shell=True, capture_output=True, text=True)
+                # 설정 파일 경로
+                config_path = Path(f"/tmp/vpn_configs/{self.interface_name}.conf")
 
-                # inet 10.8.0.14/32 형식에서 IP 추출
-                import re
-                match = re.search(r'inet\s+(\d+\.\d+\.\d+\.\d+)', ip_result.stdout)
-                if match:
-                    self.internal_ip = match.group(1)
-                    print(f"   📍 내부 IP: {self.internal_ip}")
+                # wg-quick down 시도 (설정 파일이 있으면)
+                if config_path.exists():
+                    try:
+                        down_result = subprocess.run(
+                            ['sudo', 'wg-quick', 'down', str(config_path)],
+                            capture_output=True,
+                            text=True,
+                            timeout=10
+                        )
+                        if down_result.returncode == 0:
+                            print(f"   ✓ wg-quick down 성공")
+                        else:
+                            print(f"   ⚠️  wg-quick down 실패 (강제 삭제 시도)")
+                    except Exception as e:
+                        print(f"   ⚠️  wg-quick down 오류: {e}")
 
-                return True
+                # 인터페이스 강제 삭제 (wg-quick down 실패 시 또는 설정 파일 없을 때)
+                try:
+                    # DOWN 상태로 변경
+                    subprocess.run(
+                        ['sudo', 'ip', 'link', 'set', self.interface_name, 'down'],
+                        capture_output=True,
+                        timeout=5
+                    )
+                    # 인터페이스 삭제
+                    subprocess.run(
+                        ['sudo', 'ip', 'link', 'del', self.interface_name],
+                        capture_output=True,
+                        timeout=5
+                    )
+                    print(f"   ✓ 인터페이스 강제 삭제 완료")
+                except Exception as e:
+                    print(f"   ⚠️  인터페이스 삭제 오류: {e}")
+
+                # 설정 파일 삭제
+                if config_path.exists():
+                    try:
+                        config_path.unlink()
+                        print(f"   ✓ 설정 파일 삭제 완료")
+                    except Exception:
+                        pass
+
+                # 라우팅 룰 정리
+                uid = 1000 + user_id
+                table_num = user_id
+                try:
+                    subprocess.run(
+                        ['sudo', 'ip', 'rule', 'del', 'uidrange', f'{uid}-{uid}', 'table', str(table_num)],
+                        capture_output=True,
+                        timeout=5
+                    )
+                    print(f"   ✓ 라우팅 룰 정리 완료")
+                except Exception:
+                    pass
+
+                print(f"   ✓ 기존 연결 정리 완료 - 새로운 연결 시작")
+                time.sleep(0.5)  # 정리 후 짧은 대기
 
             # 1. VPN 키 할당
             self.vpn_key_data = self.vpn_client.allocate_key(server_ip)

@@ -95,18 +95,18 @@ class BrowserCoreUC:
         options = uc.ChromeOptions()
 
         # 기본 인자
-        options.add_argument("--no-sandbox")
-        options.add_argument("--disable-dev-shm-usage")
+        # options.add_argument("--no-sandbox")
+        # options.add_argument("--disable-dev-shm-usage")
         options.add_argument("--disable-blink-features=AutomationControlled")
 
         # 네트워크 필터 (Chrome Extension - declarativeNetRequest)
-        if enable_network_filter:
-            if self.extension_dir.exists():
-                # Extension 로드
-                options.add_argument(f'--load-extension={str(self.extension_dir)}')
-                print(f"   🛡️  네트워크 필터 활성화 (Chrome Extension)")
-            else:
-                print(f"   ⚠️  네트워크 필터 Extension 없음: {self.extension_dir}")
+        # if enable_network_filter:
+        #     if self.extension_dir.exists():
+        #         # Extension 로드
+        #         options.add_argument(f'--load-extension={str(self.extension_dir)}')
+        #         print(f"   🛡️  네트워크 필터 활성화 (Chrome Extension)")
+        #     else:
+        #         print(f"   ⚠️  네트워크 필터 Extension 없음: {self.extension_dir}")
 
         # 창 위치 지정 (첫 실행 시에만 사용, 이후에는 저장된 위치 우선)
         if window_position:
@@ -119,9 +119,9 @@ class BrowserCoreUC:
         options.add_argument("--disable-features=ChromeForTestingWarning")
 
         # Chrome 131+ WSL 호환성 플래그
-        options.add_argument("--disable-gpu")
-        options.add_argument("--disable-software-rasterizer")
-        options.add_argument("--disable-features=VizDisplayCompositor")
+        # options.add_argument("--disable-gpu")
+        # options.add_argument("--disable-software-rasterizer")
+        # options.add_argument("--disable-features=VizDisplayCompositor")
 
         # 각 instance별 고유 포트 할당 (멀티 워커 충돌 방지)
         debug_port = 9222 + self.instance_id
@@ -131,13 +131,13 @@ class BrowserCoreUC:
         options.add_argument("--disk-cache-size=52428800")
 
         # Extension 사용 시 --disable-extensions 비활성화
-        if not enable_network_filter:
-            options.add_argument("--disable-extensions")
-        options.add_argument("--disable-background-networking")
+        # if not enable_network_filter:
+        #     options.add_argument("--disable-extensions")
+        # options.add_argument("--disable-background-networking")
 
         # 한국어 설정
-        options.add_argument("--lang=ko-KR")
-        options.add_argument("--accept-lang=ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7")
+        # options.add_argument("--lang=ko-KR")
+        # options.add_argument("--accept-lang=ko-KR,ko;q=0.9,en-US;q=0.8,en;q=0.7")
 
         # 시크릿 모드 (프로필 사용 시 비활성화 - Chrome 131+ 호환성)
         # options.add_argument("--incognito")
@@ -150,12 +150,12 @@ class BrowserCoreUC:
             options.add_argument(f"--user-data-dir={self.profile_dir}")
 
         # 한국어 설정 (Preferences)
-        prefs = {
-            "intl.accept_languages": "ko-KR,ko,en-US,en",
-            "translate_whitelists": {"ko": "ko"},
-            "translate": {"enabled": False}
-        }
-        options.add_experimental_option("prefs", prefs)
+        # prefs = {
+        #     "intl.accept_languages": "ko-KR,ko,en-US,en",
+        #     "translate_whitelists": {"ko": "ko"},
+        #     "translate": {"enabled": False}
+        # }
+        # options.add_experimental_option("prefs", prefs)
 
         # Performance 로그 활성화 (네트워크 필터 디버깅용)
         options.add_experimental_option("perfLoggingPrefs", {
@@ -527,11 +527,9 @@ class BrowserCoreUC:
             except Exception as e:
                 print(f"   ⚠️  네트워크 에러 모니터 시작 실패: {e}")
 
-        # 프로필 재사용 시 쿠키/세션/로컬스토리지 삭제
-        # (VPN 키 풀 사용 시에도 정상적으로 쿠팡 도메인 이동)
-        if use_profile and not fresh_profile:
-            print()  # 빈 줄
-            self.clear_all_storage(skip_navigation=False)
+        # 프로필 재사용 시 쿠키/세션/로컬스토리지 삭제는
+        # uc_agent.py에서 IP 확인 후에 수동으로 호출
+        # (IP 확인을 브라우저 최초 페이지로 만들기 위함)
 
         return self.driver
 

@@ -230,6 +230,7 @@ def run_agent_selenium_uc(
                 print("   계속 진행합니다...\n")
 
         # === 2. IP 확인 (옵션) ===
+        # 브라우저 실행 직후 최초 페이지로 실행
         if check_ip:
             print("\n" + "=" * 60)
             print("🌐 IP 주소 확인")
@@ -253,6 +254,13 @@ def run_agent_selenium_uc(
                     time.sleep(1)
             except Exception as e:
                 print(f"   ⚠️  IP 확인 실패: {e}")
+
+        # === 2-1. 프로필 정리 (쿠키/세션/로컬스토리지 삭제) ===
+        # IP 확인 후에 수행 (IP 확인을 브라우저 최초 페이지로 만들기 위함)
+        # IP 확인이 없어도 항상 수행
+        if not fresh_profile:
+            print()  # 빈 줄
+            core.clear_all_storage(skip_navigation=False)
 
         # === 3. 탐지 테스트 (옵션) ===
         if test_detection:
@@ -346,6 +354,11 @@ def run_agent_selenium_uc(
             upload_url=UPLOAD_SERVER_URL if ENABLE_SCREENSHOT_UPLOAD else None,
             enable_upload=ENABLE_SCREENSHOT_UPLOAD
         )
+
+        # === 5-1. Fingerprint 검증 설정 ===
+        # --adjust 옵션이 있을 때만 Fingerprint playground 접속
+        from common.constants import Config as ConfigModule
+        ConfigModule.ENABLE_FINGERPRINT_CHECK = enable_rank_adjust
 
         # === 6. 워크플로우 실행 ===
         workflow = SearchWorkflow(

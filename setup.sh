@@ -307,12 +307,13 @@ else
 fi
 
 # ===================================================================
-# 6. 디렉토리 생성
+# 6. 디렉토리 및 파일 권한 설정
 # ===================================================================
 
-log_step "6/9 필요한 디렉토리 생성 중..."
+log_step "6/9 디렉토리 생성 및 권한 설정 중..."
 echo ""
 
+# 디렉토리 생성
 mkdir -p "$SCRIPT_DIR/browser-profiles"
 mkdir -p "$SCRIPT_DIR/screenshots"
 mkdir -p "$SCRIPT_DIR/logs"
@@ -331,6 +332,41 @@ log_info "  ✓ screenshots/ (스크린샷 저장)"
 log_info "  ✓ logs/ (워커 로그)"
 log_info "  ✓ debug_logs/ (디버그 로그)"
 log_info "  ✓ /tmp/vpn_configs/ (VPN 설정 임시 파일)"
+
+echo ""
+
+# Python 스크립트 실행 권한 설정
+log_info "Python 스크립트 실행 권한 설정 중..."
+
+chmod +x "$SCRIPT_DIR/uc_agent.py"
+chmod +x "$SCRIPT_DIR/uc_run_workers.py"
+chmod +x "$SCRIPT_DIR/test_vpn_chrome.py" 2>/dev/null || true
+
+# 설치 스크립트 실행 권한
+chmod +x "$SCRIPT_DIR/install-chrome-versions.sh" 2>/dev/null || true
+chmod +x "$SCRIPT_DIR/install-chrome-latest.sh" 2>/dev/null || true
+chmod +x "$SCRIPT_DIR/cleanup_all_wg.sh" 2>/dev/null || true
+chmod +x "$SCRIPT_DIR/network_watchdog.sh" 2>/dev/null || true
+
+log_success "Python 스크립트 실행 권한 설정 완료"
+log_info "  ✓ uc_agent.py"
+log_info "  ✓ uc_run_workers.py"
+log_info "  ✓ test_vpn_chrome.py (있을 경우)"
+
+echo ""
+
+# 프로젝트 디렉토리 읽기 권한 설정 (wg 사용자 접근용)
+log_info "프로젝트 디렉토리 권한 설정 중..."
+
+# 프로젝트 루트: 읽기/실행 권한 부여 (다른 사용자가 접근 가능)
+chmod o+rx "$SCRIPT_DIR"
+
+# common, uc_lib 디렉토리: 읽기/실행 권한 부여
+chmod -R o+rX "$SCRIPT_DIR/common" 2>/dev/null || true
+chmod -R o+rX "$SCRIPT_DIR/uc_lib" 2>/dev/null || true
+
+log_success "프로젝트 디렉토리 권한 설정 완료"
+log_info "  ✓ wg101-112 사용자가 Python 모듈 접근 가능"
 
 # ===================================================================
 # 7. VPN 키 풀 sudoers 설정 (WireGuard)

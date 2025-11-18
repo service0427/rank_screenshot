@@ -338,20 +338,24 @@ echo ""
 # Python 스크립트 실행 권한 설정
 log_info "Python 스크립트 실행 권한 설정 중..."
 
-chmod +x "$SCRIPT_DIR/uc_agent.py"
-chmod +x "$SCRIPT_DIR/uc_run_workers.py"
-chmod +x "$SCRIPT_DIR/test_vpn_chrome.py" 2>/dev/null || true
+# 모든 Python 파일을 world-readable로 설정 (배포 서버 호환성)
+# 755: 소유자는 rwx, 그룹/기타는 rx
+chmod 755 "$SCRIPT_DIR/uc_agent.py"
+chmod 755 "$SCRIPT_DIR/uc_run_workers.py"
+chmod 755 "$SCRIPT_DIR/test_vpn_chrome.py" 2>/dev/null || true
 
 # 설치 스크립트 실행 권한
-chmod +x "$SCRIPT_DIR/install-chrome-versions.sh" 2>/dev/null || true
-chmod +x "$SCRIPT_DIR/install-chrome-latest.sh" 2>/dev/null || true
-chmod +x "$SCRIPT_DIR/cleanup_all_wg.sh" 2>/dev/null || true
-chmod +x "$SCRIPT_DIR/network_watchdog.sh" 2>/dev/null || true
+chmod 755 "$SCRIPT_DIR/install-chrome-versions.sh" 2>/dev/null || true
+chmod 755 "$SCRIPT_DIR/install-chrome-latest.sh" 2>/dev/null || true
+chmod 755 "$SCRIPT_DIR/cleanup_all_wg.sh" 2>/dev/null || true
+chmod 755 "$SCRIPT_DIR/network_watchdog.sh" 2>/dev/null || true
+chmod 755 "$SCRIPT_DIR/debug_permissions.sh" 2>/dev/null || true
 
 log_success "Python 스크립트 실행 권한 설정 완료"
-log_info "  ✓ uc_agent.py"
-log_info "  ✓ uc_run_workers.py"
-log_info "  ✓ test_vpn_chrome.py (있을 경우)"
+log_info "  ✓ uc_agent.py (755)"
+log_info "  ✓ uc_run_workers.py (755)"
+log_info "  ✓ test_vpn_chrome.py (755, 있을 경우)"
+log_info "  ✓ debug_permissions.sh (755, 있을 경우)"
 
 echo ""
 
@@ -359,14 +363,43 @@ echo ""
 log_info "프로젝트 디렉토리 권한 설정 중..."
 
 # 프로젝트 루트: 읽기/실행 권한 부여 (다른 사용자가 접근 가능)
-chmod o+rx "$SCRIPT_DIR"
+# 755: rwxr-xr-x (소유자는 전체, 기타는 읽기/실행)
+chmod 755 "$SCRIPT_DIR"
+
+# 상위 디렉토리도 확인 (홈 디렉토리)
+PARENT_DIR="$(dirname "$SCRIPT_DIR")"
+if [ -d "$PARENT_DIR" ]; then
+    chmod o+rx "$PARENT_DIR" 2>/dev/null || true
+    log_info "  ✓ 상위 디렉토리 권한 설정: $PARENT_DIR"
+fi
 
 # common, uc_lib 디렉토리: 읽기/실행 권한 부여
-chmod -R o+rX "$SCRIPT_DIR/common" 2>/dev/null || true
-chmod -R o+rX "$SCRIPT_DIR/uc_lib" 2>/dev/null || true
+# 모든 .py 파일을 644로 설정 (world-readable)
+if [ -d "$SCRIPT_DIR/common" ]; then
+    chmod 755 "$SCRIPT_DIR/common"
+    find "$SCRIPT_DIR/common" -type d -exec chmod 755 {} \; 2>/dev/null || true
+    find "$SCRIPT_DIR/common" -type f -name "*.py" -exec chmod 644 {} \; 2>/dev/null || true
+    log_info "  ✓ common/ 디렉토리 권한 설정 완료"
+fi
+
+if [ -d "$SCRIPT_DIR/uc_lib" ]; then
+    chmod 755 "$SCRIPT_DIR/uc_lib"
+    find "$SCRIPT_DIR/uc_lib" -type d -exec chmod 755 {} \; 2>/dev/null || true
+    find "$SCRIPT_DIR/uc_lib" -type f -name "*.py" -exec chmod 644 {} \; 2>/dev/null || true
+    log_info "  ✓ uc_lib/ 디렉토리 권한 설정 완료"
+fi
+
+# chrome-version 디렉토리도 실행 권한 필요
+if [ -d "$SCRIPT_DIR/chrome-version" ]; then
+    chmod 755 "$SCRIPT_DIR/chrome-version"
+    find "$SCRIPT_DIR/chrome-version" -type d -exec chmod 755 {} \; 2>/dev/null || true
+    log_info "  ✓ chrome-version/ 디렉토리 권한 설정 완료"
+fi
 
 log_success "프로젝트 디렉토리 권한 설정 완료"
 log_info "  ✓ wg101-112 사용자가 Python 모듈 접근 가능"
+log_info "  ✓ 모든 .py 파일: 644 (world-readable)"
+log_info "  ✓ 모든 디렉토리: 755 (world-executable)"
 
 # ===================================================================
 # 7. VPN 키 풀 sudoers 설정 (WireGuard)
